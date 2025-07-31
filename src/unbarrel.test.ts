@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import mock from 'mock-fs';
 import { unbarrel } from './unbarrel';
 
-describe.skip('File System Operations', () => {
+describe.skip('unbarrel tests', () => {
   afterEach(() => {
     mock.restore();
   });
