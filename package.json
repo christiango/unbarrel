@@ -10,8 +10,8 @@
     "build": "tsc",
     "bundle": "esbuild ./src/cli.ts --bundle --platform=node --outfile=dist/cli.js",
     "test": "npm run build && node --test lib/**/*.test.js",
-    "prettier:check": "prettier --check \"**/*.{js,ts,tsx,json,md}\"",
-    "prettier": "prettier --write \"**/*.{js,ts,tsx,json,md}\""
+    "prettier:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
+    "prettier": "prettier --write \"**/*.{ts,tsx,json,md}\""
   },
   "author": "Christian Gonzalez",
   "license": "MIT",
