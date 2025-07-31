@@ -1,0 +1,36 @@
+{
+  "name": "@christiango/unbarrel",
+  "version": "0.0.1",
+  "description": "Utilities for optimizing barrel files",
+  "main": "lib/index.js",
+  "bin": {
+    "unbarrel": "lib/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "bundle": "esbuild ./src/cli.ts --bundle --platform=node --outfile=dist/cli.js",
+    "test": "npm run build && node --test lib/**/*.test.js",
+    "prettier:check": "prettier --check \"**/*.{js,ts,tsx,json,md}\"",
+    "prettier": "prettier --write \"**/*.{js,ts,tsx,json,md}\""
+  },
+  "author": "Christian Gonzalez",
+  "license": "MIT",
+  "dependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/plugin-syntax-jsx": "^7.27.1",
+    "@babel/plugin-syntax-typescript": "^7.27.1",
+    "@babel/preset-typescript": "^7.27.1",
+    "@babel/traverse": "^7.28.0",
+    "commander": "^14.0.0",
+    "esbuild": "^0.25.6"
+  },
+  "devDependencies": {
+    "@types/babel__core": "^7.20.5",
+    "@types/babel__traverse": "^7.18.0",
+    "@types/mock-fs": "^4.13.4",
+    "@types/node": "^22.0.0",
+    "mock-fs": "^5.5.0",
+    "prettier": "^2.8.0",
+    "typescript": "^5.8.3"
+  }
+}
