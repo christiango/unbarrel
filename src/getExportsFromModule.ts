@@ -44,9 +44,9 @@ export interface ModuleExports {
 }
 
 /**
- *
- * @param absoluteRootPath
- * @param modulePathRelativeToRoot
+ * Gets all the exports from a module, including both definitions and re-exports.
+ * @param absoluteRootPath - The absolute path of the root directory
+ * @param modulePathRelativeToRoot - The path to the module being parsed, relative to the root path
  * @returns
  */
 export function getExportsFromModule(absoluteRootPath: string, modulePathRelativeToRoot: string): ModuleExports {
