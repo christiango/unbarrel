@@ -57,7 +57,54 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
 
   const ast = parseTypescriptFile(path.resolve(absoluteRootPath, modulePathRelativeToRoot));
 
-  traverse(ast, {});
+  traverse(ast, {
+    ExportDeclaration(path) {
+      if ('declaration' in path.node && path.node.declaration) {
+        const name = getNameFromDeclaration(path.node.declaration);
+        results.definitions.push({
+          name,
+          typeOnly:
+            path.node.declaration.type === 'TSTypeAliasDeclaration' ||
+            path.node.declaration.type === 'TSInterfaceDeclaration',
+        });
+      }
+    },
+  });
 
   return results;
+}
+
+/**
+ * Extracts the name of a defined function, class, interface, type alias ,etc
+ */
+function getNameFromDeclaration(declaration: babel.types.Declaration | babel.types.Expression): string {
+  if (
+    declaration.type === 'FunctionDeclaration' ||
+    declaration.type === 'ClassDeclaration' ||
+    declaration.type == 'TSInterfaceDeclaration' ||
+    declaration.type === 'TSTypeAliasDeclaration' ||
+    declaration.type == 'TSDeclareFunction' ||
+    declaration.type === 'TSEnumDeclaration'
+  ) {
+    if (!declaration.id) {
+      throw new Error(`${declaration} without an id found, we don't support these yet`);
+    }
+
+    return declaration.id?.name;
+  }
+
+  if (declaration.type === 'VariableDeclaration') {
+    if (declaration.declarations.length === 0) {
+      throw new Error(`Variable declaration without any declarators found: ${declaration}`);
+    }
+    if (declaration.declarations.length > 1) {
+      throw new Error(`Variable declaration with multiple declarators found: ${declaration}`);
+    }
+    if (!('name' in declaration.declarations[0].id)) {
+      throw new Error(`Variable declaration without name found: ${declaration}`);
+    }
+    return declaration.declarations[0].id.name;
+  }
+
+  throw new Error(`getNameFromDeclaration currently does not support declaration type: ${declaration.type}`);
 }
