@@ -25,8 +25,15 @@ export interface ExportDefinition {
   name: string;
 }
 
-/** An item re-exported by the module */
-export interface ModuleReExport {
+/** This is set for any export * statements */
+export interface ModuleReExportAll {
+  type: 'exportAll';
+  /** The name of the export as it is imported in the module */
+  importPath: string;
+}
+
+export interface ModuleNamedReExport {
+  type: 'namedExport';
   /** The name of the export as it is imported in the module */
   importedName: string;
   /** The name of the export as it is exported from the module, it will not be the same as the imported name when the as operator is used */
@@ -34,6 +41,9 @@ export interface ModuleReExport {
   /** The path to the module where this re-export was imported from */
   importPath: string;
 }
+
+/** An item re-exported by the module */
+export type ModuleReExport = ModuleReExportAll | ModuleNamedReExport;
 
 /** All the exports in a given module */
 export interface ModuleExports {
