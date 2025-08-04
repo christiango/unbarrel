@@ -90,4 +90,55 @@ describe('getExportsFromModule tests', () => {
       reExports: [],
     });
   });
+
+  it('returns all the default exports defined in a file', () => {
+    mock({
+      '/defaultFunction.ts': 'export default function fn() {};',
+      '/defaultClass.ts': 'export default class MyClass {}',
+      '/defaultValue.ts': 'export default 42;',
+      '/defaultInterface.ts': 'export default interface MyInterface {}',
+
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/', './defaultFunction.ts'), {
+      definitions: [
+        {
+          type: 'defaultExport',
+          typeOnly: false,
+        },
+      ],
+      reExports: [],
+    });
+
+    assert.deepEqual(getExportsFromModule('/', './defaultClass.ts'), {
+      definitions: [
+        {
+          type: 'defaultExport',
+          typeOnly: false,
+        },
+      ],
+      reExports: [],
+    });
+
+    assert.deepEqual(getExportsFromModule('/', './defaultValue.ts'), {
+      definitions: [
+        {
+          type: 'defaultExport',
+          typeOnly: false,
+        },
+      ],
+      reExports: [],
+    });
+
+    assert.deepEqual(getExportsFromModule('/', './defaultInterface.ts'), {
+      definitions: [
+        {
+          type: 'defaultExport',
+          typeOnly: true,
+        },
+      ],
+      reExports: [],
+    });
+  });
 });

@@ -77,15 +77,21 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
   const ast = parseTypescriptFile(path.resolve(absoluteRootPath, modulePathRelativeToRoot));
 
   traverse(ast, {
-    ExportDeclaration(path) {
+    ExportNamedDeclaration(path) {
       if ('declaration' in path.node && path.node.declaration) {
         const name = getNameFromDeclaration(path.node.declaration);
         results.definitions.push({
           type: 'namedExport',
           name,
-          typeOnly:
-            path.node.declaration.type === 'TSTypeAliasDeclaration' ||
-            path.node.declaration.type === 'TSInterfaceDeclaration',
+          typeOnly: isTypeOnlyDeclaration(path.node.declaration),
+        });
+      }
+    },
+    ExportDefaultDeclaration(path) {
+      if (path.node.declaration) {
+        results.definitions.push({
+          type: 'defaultExport',
+          typeOnly: isTypeOnlyDeclaration(path.node.declaration),
         });
       }
     },
@@ -94,6 +100,9 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
   return results;
 }
 
+function isTypeOnlyDeclaration(declaration: babel.types.Declaration | babel.types.Expression): boolean {
+  return declaration.type === 'TSTypeAliasDeclaration' || declaration.type === 'TSInterfaceDeclaration';
+}
 /**
  * Extracts the name of a defined function, class, interface, type alias ,etc
  */
