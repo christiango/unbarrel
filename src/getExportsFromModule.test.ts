@@ -57,26 +57,32 @@ describe('getExportsFromModule tests', () => {
     assert.deepEqual(getExportsFromModule('/', './test.ts'), {
       definitions: [
         {
+          type: 'namedExport',
           typeOnly: false,
           name: 'myValue',
         },
         {
+          type: 'namedExport',
           typeOnly: false,
           name: 'myFunction',
         },
         {
+          type: 'namedExport',
           typeOnly: false,
           name: 'MyClass',
         },
         {
+          type: 'namedExport',
           typeOnly: true,
           name: 'MyType',
         },
         {
+          type: 'namedExport',
           typeOnly: true,
           name: 'MyInterface',
         },
         {
+          type: 'namedExport',
           typeOnly: false,
           name: 'MyEnum',
         },

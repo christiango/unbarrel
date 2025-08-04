@@ -17,13 +17,22 @@ function parseTypescriptFile(absoluteFilePath: string): babel.ParseResult {
   return ast;
 }
 
-/** An export definition */
-export interface ExportDefinition {
+export interface NamedExportDefinition {
+  type: 'namedExport';
   /** Set to true if the import is a type only export, false if it is exported as a value */
   typeOnly: boolean;
   /** The name of the export as it is exported from the module */
   name: string;
 }
+
+export interface DefaultExportDefinition {
+  type: 'defaultExport';
+  /** Set to true if the import is a type only export, false if it is exported as a value */
+  typeOnly: boolean;
+}
+
+/** An export definition */
+export type ExportDefinition = NamedExportDefinition | DefaultExportDefinition;
 
 /** This is set for any export * statements */
 export interface ModuleReExportAll {
@@ -50,7 +59,7 @@ export interface ModuleExports {
   /** The exports whose definition lives in this module  */
   definitions: ExportDefinition[];
   /** The exports whose definitions reside in another module */
-  reExports: {}[];
+  reExports: ModuleReExport[];
 }
 
 /**
@@ -72,6 +81,7 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
       if ('declaration' in path.node && path.node.declaration) {
         const name = getNameFromDeclaration(path.node.declaration);
         results.definitions.push({
+          type: 'namedExport',
           name,
           typeOnly:
             path.node.declaration.type === 'TSTypeAliasDeclaration' ||
