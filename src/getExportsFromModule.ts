@@ -49,6 +49,8 @@ export interface ModuleNamedReExport {
   exportedName: string;
   /** The path to the module where this re-export was imported from */
   importPath: string;
+  /** Set to true if the import is a type only export, false if it is exported as a value */
+  typeOnly: boolean;
 }
 
 /** An item re-exported by the module */
@@ -99,6 +101,7 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
                 importedName: specifier.local.name,
                 exportedName: specifier.exported.name,
                 importPath: path.node.source.value,
+                typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
               });
             }
           }
