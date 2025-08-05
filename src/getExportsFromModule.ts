@@ -85,6 +85,24 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
           name,
           typeOnly: isTypeOnlyDeclaration(path.node.declaration),
         });
+      } else if (path.node.specifiers) {
+        if (path.node.specifiers.length > 0) {
+          for (const specifier of path.node.specifiers) {
+            if (
+              specifier.type === 'ExportSpecifier' &&
+              specifier.exported.type === 'Identifier' &&
+              'source' in path.node &&
+              path.node.source
+            ) {
+              results.reExports.push({
+                type: 'namedExport',
+                importedName: specifier.local.name,
+                exportedName: specifier.exported.name,
+                importPath: path.node.source.value,
+              });
+            }
+          }
+        }
       }
     },
     ExportDefaultDeclaration(path) {
@@ -92,6 +110,14 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
         results.definitions.push({
           type: 'defaultExport',
           typeOnly: isTypeOnlyDeclaration(path.node.declaration),
+        });
+      }
+    },
+    ExportAllDeclaration(path) {
+      if ('source' in path.node && path.node.source) {
+        results.reExports.push({
+          type: 'exportAll',
+          importPath: path.node.source.value,
         });
       }
     },

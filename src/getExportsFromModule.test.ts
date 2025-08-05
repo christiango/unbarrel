@@ -141,4 +141,67 @@ describe('getExportsFromModule tests', () => {
       reExports: [],
     });
   });
+
+  it('handles re-exports', () => {
+    mock({
+      '/test.ts': `
+      export * from './math/add';
+
+      export { divide, divideByTwo, divideBy3 as divideByThree } from './math/divide';
+
+      export { multiply as times } from './math/multiply';
+
+      export { default as subtract } from './math/subtract';
+      
+      export { createRoot } from 'react-dom/client';
+
+      export * from 'react';
+    `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/', './test.ts'), {
+      definitions: [],
+      reExports: [
+        { type: 'exportAll', importPath: './math/add' },
+        {
+          type: 'namedExport',
+          importedName: 'divide',
+          exportedName: 'divide',
+          importPath: './math/divide',
+        },
+        {
+          type: 'namedExport',
+          importedName: 'divideByTwo',
+          exportedName: 'divideByTwo',
+          importPath: './math/divide',
+        },
+        {
+          type: 'namedExport',
+          importedName: 'divideBy3',
+          exportedName: 'divideByThree',
+          importPath: './math/divide',
+        },
+        {
+          type: 'namedExport',
+          importedName: 'multiply',
+          exportedName: 'times',
+          importPath: './math/multiply',
+        },
+        {
+          type: 'namedExport',
+          importedName: 'default',
+          exportedName: 'subtract',
+          importPath: './math/subtract',
+        },
+        {
+          type: 'namedExport',
+          importedName: 'createRoot',
+          exportedName: 'createRoot',
+          importPath: 'react-dom/client',
+        },
+        { type: 'exportAll', importPath: 'react' },
+      ],
+    });
+  });
 });
