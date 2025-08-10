@@ -257,4 +257,87 @@ describe('getExportsFromModule tests', () => {
       ],
     });
   });
+  it('handles re-exports using import and export', () => {
+    mock({
+      '/test.ts': `
+      import { createRoot, useEffect as renamedUseEffect } from 'react';
+      import { subtract, subtract2 as subtractTwo } from './math/subtract'
+      import { type divide, type divideBy2 as divideByTwo } from './math/divide';
+      import type { add } from './math/add'
+      import { default as multiply } from './math/multiply';
+      import double from './math/double';
+
+      export { createRoot, renamedUseEffect };
+      export { subtract, subtractTwo as renamedSubtractTwo, divide, type divideByTwo, add, multiply, double };
+    `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/', './test.ts'), {
+      definitions: [],
+      reExports: [
+        {
+          type: 'namedExport',
+          importedName: 'createRoot',
+          exportedName: 'createRoot',
+          importPath: 'react',
+          typeOnly: false,
+        },
+        {
+          type: 'namedExport',
+          importedName: 'useEffect',
+          exportedName: 'renamedUseEffect',
+          importPath: 'react',
+          typeOnly: false,
+        },
+        {
+          type: 'namedExport',
+          importedName: 'subtract',
+          exportedName: 'subtract',
+          importPath: './math/subtract',
+          typeOnly: false,
+        },
+        {
+          type: 'namedExport',
+          importedName: 'subtract2',
+          exportedName: 'renamedSubtractTwo',
+          importPath: './math/subtract',
+          typeOnly: false,
+        },
+        {
+          type: 'namedExport',
+          importedName: 'divide',
+          exportedName: 'divide',
+          importPath: './math/divide',
+          typeOnly: true,
+        },
+        {
+          type: 'namedExport',
+          importedName: 'divideBy2',
+          exportedName: 'divideByTwo',
+          importPath: './math/divide',
+          typeOnly: true,
+        },
+        {
+          type: 'namedExport',
+          importedName: 'add',
+          exportedName: 'add',
+          importPath: './math/add',
+          typeOnly: true,
+        },
+        {
+          type: 'defaultExport',
+          exportedName: 'multiply',
+          importPath: './math/multiply',
+          typeOnly: false,
+        },
+        {
+          type: 'defaultExport',
+          exportedName: 'double',
+          importPath: './math/double',
+          typeOnly: false,
+        },
+      ],
+    });
+  });
 });

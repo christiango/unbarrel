@@ -53,8 +53,18 @@ export interface ModuleNamedReExport {
   typeOnly: boolean;
 }
 
+export interface ModuleDefaultReExport {
+  type: 'defaultExport';
+  /** The name of the export as it is exported from the module, it will not be the same as the imported name when the as operator is used */
+  exportedName: string;
+  /** The path to the module where this re-export was imported from */
+  importPath: string;
+  /** Set to true if the import is a type only export, false if it is exported as a value */
+  typeOnly: boolean;
+}
+
 /** An item re-exported by the module */
-export type ModuleReExport = ModuleReExportAll | ModuleNamedReExport;
+export type ModuleReExport = ModuleReExportAll | ModuleNamedReExport | ModuleDefaultReExport;
 
 /** All the exports in a given module */
 export interface ModuleExports {
@@ -78,6 +88,15 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
 
   const ast = parseTypescriptFile(path.resolve(absoluteRootPath, modulePathRelativeToRoot));
 
+  // For statements like export { foo } with no source, we need to find them source or corresponding export statement.
+  // The key here is the local name we are looking for.
+  // For export { foo as bar }, the key would be foo
+  // For export { foo }, the key would be foo
+  const exportsToFindInSecondPass = new Map<
+    string,
+    { importedName: string; exportedName: string; typeOnly: boolean }
+  >();
+
   traverse(ast, {
     ExportNamedDeclaration(path) {
       if ('declaration' in path.node && path.node.declaration) {
@@ -90,19 +109,22 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
       } else if (path.node.specifiers) {
         if (path.node.specifiers.length > 0) {
           for (const specifier of path.node.specifiers) {
-            if (
-              specifier.type === 'ExportSpecifier' &&
-              specifier.exported.type === 'Identifier' &&
-              'source' in path.node &&
-              path.node.source
-            ) {
-              results.reExports.push({
-                type: 'namedExport',
-                importedName: specifier.local.name,
-                exportedName: specifier.exported.name,
-                importPath: path.node.source.value,
-                typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
-              });
+            if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
+              if ('source' in path.node && path.node.source) {
+                results.reExports.push({
+                  type: 'namedExport',
+                  importedName: specifier.local.name,
+                  exportedName: specifier.exported.name,
+                  importPath: path.node.source.value,
+                  typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
+                });
+              } else {
+                exportsToFindInSecondPass.set(specifier.local.name, {
+                  importedName: specifier.local.name,
+                  exportedName: specifier.exported.name,
+                  typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
+                });
+              }
             }
           }
         }
@@ -126,7 +148,59 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
     },
   });
 
+  if (exportsToFindInSecondPass.size > 0) {
+    traverse(ast, {
+      ImportDeclaration(path) {
+        const importPath = path.node.source.value;
+
+        for (const specifier of path.node.specifiers) {
+          if (
+            specifier.type === 'ImportDefaultSpecifier' ||
+            (specifier.type === 'ImportSpecifier' && getImportedNameFromSpecifier(specifier) === 'default')
+          ) {
+            const exportedName = specifier.local.name;
+            const candidateExportMatch = exportsToFindInSecondPass.get(exportedName);
+            if (candidateExportMatch) {
+              results.reExports.push({
+                type: 'defaultExport',
+                exportedName: candidateExportMatch.exportedName,
+                importPath,
+                typeOnly: candidateExportMatch.typeOnly,
+              });
+
+              exportsToFindInSecondPass.delete(exportedName);
+            }
+          } else if (specifier.type === 'ImportSpecifier') {
+            const importedName = getImportedNameFromSpecifier(specifier);
+            const exportedName = specifier.local.name;
+            const candidateExportMatch = exportsToFindInSecondPass.get(exportedName);
+            if (candidateExportMatch) {
+              results.reExports.push({
+                type: 'namedExport',
+                importedName,
+                exportedName: candidateExportMatch.exportedName,
+                importPath,
+                typeOnly:
+                  candidateExportMatch.typeOnly || specifier.importKind === 'type' || path.node.importKind === 'type',
+              });
+
+              exportsToFindInSecondPass.delete(exportedName);
+            }
+          }
+        }
+      },
+    });
+  }
+
+  if (exportsToFindInSecondPass.size !== 0) {
+    throw new Error(`Could not find source for exports: ${[...exportsToFindInSecondPass.keys()].join(',')}`);
+  }
+
   return results;
+}
+
+function getImportedNameFromSpecifier(specifier: babel.types.ImportSpecifier) {
+  return specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value;
 }
 
 function isTypeOnlyDeclaration(declaration: babel.types.Declaration | babel.types.Expression): boolean {
