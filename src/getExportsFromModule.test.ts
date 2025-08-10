@@ -410,4 +410,18 @@ describe('getExportsFromModule tests', () => {
       reExports: [],
     });
   });
+
+  it('throws an error when it cannot find a reference to an export', () => {
+    mock({
+      '/test.ts': `
+      
+      function myFunction() {}
+
+      export { myValue, myFunction };
+    `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.throws(() => getExportsFromModule('/does-not-exist'), `Could not find source for exports: myFunction`);
+  });
 });
