@@ -15,7 +15,7 @@ describe('getExportsFromModule tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
-    assert.deepEqual(getExportsFromModule('/', './test.ts'), { definitions: [], reExports: [] });
+    assert.deepEqual(getExportsFromModule('/test.ts'), { definitions: [], reExports: [] });
   });
 
   it('returns no exports for a file with an empty export', () => {
@@ -27,7 +27,7 @@ describe('getExportsFromModule tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
-    assert.deepEqual(getExportsFromModule('/test', './index.ts'), { definitions: [], reExports: [] });
+    assert.deepEqual(getExportsFromModule('/test/index.ts'), { definitions: [], reExports: [] });
   });
 
   it('returns all the exports defined in a file', () => {
@@ -54,7 +54,7 @@ describe('getExportsFromModule tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
-    assert.deepEqual(getExportsFromModule('/', './test.ts'), {
+    assert.deepEqual(getExportsFromModule('/test.ts'), {
       definitions: [
         {
           type: 'namedExport',
@@ -101,7 +101,7 @@ describe('getExportsFromModule tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
-    assert.deepEqual(getExportsFromModule('/', './defaultFunction.ts'), {
+    assert.deepEqual(getExportsFromModule('/defaultFunction.ts'), {
       definitions: [
         {
           type: 'defaultExport',
@@ -111,7 +111,7 @@ describe('getExportsFromModule tests', () => {
       reExports: [],
     });
 
-    assert.deepEqual(getExportsFromModule('/', './defaultClass.ts'), {
+    assert.deepEqual(getExportsFromModule('/defaultClass.ts'), {
       definitions: [
         {
           type: 'defaultExport',
@@ -121,7 +121,7 @@ describe('getExportsFromModule tests', () => {
       reExports: [],
     });
 
-    assert.deepEqual(getExportsFromModule('/', './defaultValue.ts'), {
+    assert.deepEqual(getExportsFromModule('/defaultValue.ts'), {
       definitions: [
         {
           type: 'defaultExport',
@@ -131,7 +131,7 @@ describe('getExportsFromModule tests', () => {
       reExports: [],
     });
 
-    assert.deepEqual(getExportsFromModule('/', './defaultInterface.ts'), {
+    assert.deepEqual(getExportsFromModule('/defaultInterface.ts'), {
       definitions: [
         {
           type: 'defaultExport',
@@ -160,7 +160,7 @@ describe('getExportsFromModule tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
-    assert.deepEqual(getExportsFromModule('/', './test.ts'), {
+    assert.deepEqual(getExportsFromModule('/test.ts'), {
       definitions: [],
       reExports: [
         {
@@ -223,7 +223,7 @@ describe('getExportsFromModule tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
-    assert.deepEqual(getExportsFromModule('/', './test.ts'), {
+    assert.deepEqual(getExportsFromModule('/test.ts'), {
       definitions: [],
       reExports: [
         {
@@ -273,7 +273,7 @@ describe('getExportsFromModule tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
-    assert.deepEqual(getExportsFromModule('/', './test.ts'), {
+    assert.deepEqual(getExportsFromModule('/test.ts'), {
       definitions: [],
       reExports: [
         {
@@ -369,7 +369,7 @@ describe('getExportsFromModule tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
-    assert.deepEqual(getExportsFromModule('/', './test.ts'), {
+    assert.deepEqual(getExportsFromModule('/test.ts'), {
       definitions: [
         {
           type: 'namedExport',

@@ -76,17 +76,16 @@ export interface ModuleExports {
 
 /**
  * Gets all the exports from a module, including both definitions and re-exports.
- * @param absoluteRootPath - The absolute path of the root directory
- * @param modulePathRelativeToRoot - The path to the module being parsed, relative to the root path
- * @returns
+ * @param absoluteFilePath - The absolute path of the file to analyze
+ * @returns - The module exports
  */
-export function getExportsFromModule(absoluteRootPath: string, modulePathRelativeToRoot: string): ModuleExports {
+export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
   const results: ModuleExports = {
     definitions: [],
     reExports: [],
   };
 
-  const ast = parseTypescriptFile(path.resolve(absoluteRootPath, modulePathRelativeToRoot));
+  const ast = parseTypescriptFile(absoluteFilePath);
 
   // For statements like export { foo } with no source, we need to find them source or corresponding export statement.
   // The key here is the local name we are looking for.
