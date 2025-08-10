@@ -340,4 +340,74 @@ describe('getExportsFromModule tests', () => {
       ],
     });
   });
+
+  it('returns definitions from export statements referencing things defined in the current module ', () => {
+    mock({
+      '/index.ts': 'export {} from "./test";',
+      '/test.ts': `
+      const myValue = 42;
+      
+      function myFunction() {}
+      
+      class MyClass {}
+      
+      type MyType = string;
+      
+      interface MyInterface {
+        prop: string;
+      }
+
+      enum MyEnum {
+        A = 'A',
+        B = 'B',
+      }
+
+      const fn = () => {}
+
+      export { myValue, myFunction, MyClass, type MyType, MyInterface, MyEnum, fn as renamedFn };
+    `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/', './test.ts'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'myValue',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'myFunction',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'MyClass',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'MyType',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'MyInterface',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'MyEnum',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'renamedFn',
+        },
+      ],
+      reExports: [],
+    });
+  });
 });

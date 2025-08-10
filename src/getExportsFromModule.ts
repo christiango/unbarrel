@@ -189,6 +189,26 @@ export function getExportsFromModule(absoluteRootPath: string, modulePathRelativ
           }
         }
       },
+      Declaration(path) {
+        if (
+          path.node.type !== 'ImportDeclaration' &&
+          path.node.type !== 'ExportNamedDeclaration' &&
+          path.node.type !== 'ExportDefaultDeclaration' &&
+          path.node.type !== 'ExportAllDeclaration'
+        ) {
+          const name = getNameFromDeclaration(path.node);
+          const candidateExportMatch = exportsToFindInSecondPass.get(name);
+          if (candidateExportMatch) {
+            results.definitions.push({
+              type: 'namedExport',
+              name: candidateExportMatch.exportedName,
+              typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
+            });
+
+            exportsToFindInSecondPass.delete(name);
+          }
+        }
+      },
     });
   }
 
