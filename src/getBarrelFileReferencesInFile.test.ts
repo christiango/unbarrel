@@ -37,8 +37,12 @@ describe('getBarrelFileReferencesInFile tests', () => {
       export { reExportFromExternalPackage } from "react";
       `,
       '/test.ts': 'export const test = 1;',
-      '/barrelFileReference/index.ts': 'export { barrelFileReference } from "./barrelFileReference";',
-      '/barrelFileReference/barrelFileReference.ts': 'export const barrelFileReference = 12',
+      '/barrelFileReference/index.ts':
+        'export { barrelFileReference, anotherBarrelFileReference } from "./barrelFileReference";',
+      '/barrelFileReference/barrelFileReference.ts': `
+      export const barrelFileReference = 12;
+      export const anotherBarrelFileReference = 34;
+      `,
 
       './node_modules': mock.load('node_modules'),
     });
