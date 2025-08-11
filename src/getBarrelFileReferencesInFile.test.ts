@@ -44,7 +44,7 @@ describe('getBarrelFileReferencesInFile tests', () => {
     });
 
     assert.deepEqual(getBarrelFileReferencesInFile('/index.ts'), [
-      { barrelFilePath: '/barrelFileIndex/index.ts' },
+      { barrelFilePath: './barrelFileReference/index.ts' },
       { barrelFilePath: 'react' },
     ]);
   });

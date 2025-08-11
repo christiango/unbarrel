@@ -33,11 +33,11 @@ export function getBarrelFileReferencesInFile(absoluteFilePath: string): BarrelF
           ),
         });
       }
+    } else {
+      result.push({
+        barrelFilePath: reExportToVisit.importPath,
+      });
     }
-
-    result.push({
-      barrelFilePath: reExportToVisit.importPath,
-    });
   }
 
   return result;
