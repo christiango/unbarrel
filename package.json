@@ -11,7 +11,9 @@
     "bundle": "esbuild ./src/cli.ts --bundle --platform=node --outfile=dist/cli.js",
     "test": "npm run build && node --test lib/**/*.test.js",
     "prettier:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
-    "prettier": "prettier --write \"**/*.{ts,tsx,json,md}\""
+    "prettier": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "clean": "node ./scripts/clean.js",
+    "scrub": "node ./scripts/clean.js --scrub"
   },
   "author": "Christian Gonzalez",
   "license": "MIT",
