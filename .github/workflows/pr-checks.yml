@@ -12,23 +12,5 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'yarn'
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Run prettier check
-        run: yarn prettier:check
-
-      - name: Build project
-        run: yarn build
-
-      - name: Run tests
-        run: yarn test
-
-      - name: Bundle project
-        run: yarn bundle
+      - name: Build and Test
+        uses: ./.github/actions/build-and-test

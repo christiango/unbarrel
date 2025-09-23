@@ -15,6 +15,10 @@
     "clean": "node ./scripts/clean.js",
     "scrub": "node ./scripts/clean.js --scrub"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/christiango/unbarrel.git"
+  },
   "author": "Christian Gonzalez",
   "license": "MIT",
   "dependencies": {
