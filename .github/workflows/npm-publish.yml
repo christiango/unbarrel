@@ -1,0 +1,35 @@
+name: Publish package to GitHub Packages
+on:
+  release:
+    types: [published]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and Test
+        uses: ./.github/actions/build-and-test
+
+      # Setup .npmrc file to publish to GitHub Packages
+      - name: Setup Node.js for publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@christiango'
+
+      - name: Set npm version
+        run: |
+          echo "Setting package version to: ${{ github.event.release.tag_name }}"
+          npm version ${{ github.event.release.tag_name }} --git-tag-version=false
+          echo "Package version set to: $(npm pkg get version | tr -d '"')"
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
