@@ -30,6 +30,6 @@ jobs:
           echo "Package version set to: $(npm pkg get version | tr -d '"')"
 
       - name: Publish to npm
-        run: npm publish
+        run: npm publish --access=public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
