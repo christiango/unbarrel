@@ -1,6 +1,6 @@
 {
   "name": "@christiango/unbarrel",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "Utilities for optimizing barrel files",
   "main": "lib/index.js",
   "bin": {
