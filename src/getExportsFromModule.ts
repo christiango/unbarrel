@@ -1,21 +1,7 @@
 import * as babel from '@babel/core';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import traverse from '@babel/traverse';
-
-/** Parses a typescript file into an AST using babel */
-function parseTypescriptFile(absoluteFilePath: string): babel.ParseResult {
-  const fileContents = fs.readFileSync(absoluteFilePath, 'utf-8');
-  const ast = babel.parse(fileContents, {
-    sourceType: 'module',
-    presets: [['@babel/preset-typescript', { isTSX: absoluteFilePath.endsWith('.tsx'), allExtensions: true }]],
-  });
-  if (!ast) {
-    throw new Error(`Failed to parse file: ${absoluteFilePath}`);
-  }
-
-  return ast;
-}
+import { parseTypescriptFile } from './astUtils';
 
 export interface NamedExportDefinition {
   type: 'namedExport';
@@ -138,12 +124,10 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
       }
     },
     ExportAllDeclaration(path) {
-      if ('source' in path.node && path.node.source) {
-        results.reExports.push({
-          type: 'exportAll',
-          importPath: path.node.source.value,
-        });
-      }
+      results.reExports.push({
+        type: 'exportAll',
+        importPath: path.node.source.value,
+      });
     },
   });
 
