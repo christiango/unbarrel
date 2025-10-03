@@ -341,7 +341,7 @@ describe('getExportsFromModule tests', () => {
     });
   });
 
-  it('returns definitions from export statements referencing things defined in the current module ', () => {
+  it('returns definitions from export statements referencing things defined in the current module', () => {
     mock({
       '/index.ts': 'export {} from "./test";',
       '/test.ts': `
@@ -423,5 +423,34 @@ describe('getExportsFromModule tests', () => {
     });
 
     assert.throws(() => getExportsFromModule('/does-not-exist'), `Could not find source for exports: myFunction`);
+  });
+
+  it('is able to handle exporting something found via destructuring', () => {
+    mock({
+      '/test.ts': `
+      
+      function myFunction() {
+        return { 
+          foo : 42
+        }
+      }
+
+      const { foo } = myFunction();
+
+      export { foo };
+    `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/test.ts'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'foo',
+        },
+      ],
+      reExports: [],
+    });
   });
 });
