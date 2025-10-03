@@ -1,6 +1,14 @@
 import path from 'node:path';
 
 /**
+ * Normalizes any Windows style path separators into POSIX separators so the path can be used in import specifiers.
+ * @param filePath The path to normalize
+ */
+export function normalizeToPosixPath(filePath: string): string {
+  return filePath.split(path.sep).join(path.posix.sep);
+}
+
+/**
  * Returns true if the import path is to an internal module and false if it's an external package
  * @param importPath The path to check
  * @returns true for relative path like './foo' and false for external paths like 'react'
@@ -15,11 +23,13 @@ export function isInternalModule(importPath: string): boolean {
  * @returns The converted path, which is suitable for ESM imports
  */
 export function convertToESMImportPath(relativePath: string): string {
-  if (relativePath.startsWith('.')) {
-    return relativePath;
+  const normalizedPath = normalizeToPosixPath(relativePath);
+
+  if (normalizedPath.startsWith('.')) {
+    return normalizedPath;
   }
 
-  return './' + relativePath;
+  return './' + normalizedPath;
 }
 
 /**

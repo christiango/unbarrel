@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { normalizeToPosixPath } from './importUtils';
+
 /** Given a module path, attempts to get the path to that module, accounting to the fact that the absolute path may be missing an extension or pointing to a barrel file (index.ts/js etc)
  * @param absoluteModulePath - The absolute path to the module, which may be missing an extension or pointing to a directory
  * @returns - The resolved absolute path to the module file
@@ -40,5 +42,5 @@ export function resolveModulePath(absoluteModulePath: string): string {
     throw new Error(`Could not resolve module: ${absoluteModulePath}`);
   }
 
-  return resolvedFilePath;
+  return normalizeToPosixPath(resolvedFilePath);
 }
