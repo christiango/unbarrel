@@ -25,6 +25,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           scope: '@christiango'
 
+      # Ensure npm 11.5.1 or later is installed to support trusted publishing
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Set npm version
         run: |
           echo "Setting package version to: ${{ github.event.release.tag_name }}"
