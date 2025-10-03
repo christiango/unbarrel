@@ -2,12 +2,13 @@ name: Publish package to GitHub Packages
 on:
   release:
     types: [published]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      id-token: write # Required for OIDC publishing
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
