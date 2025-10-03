@@ -34,7 +34,6 @@ describe('getBarrelFileReferencesInFile tests', () => {
       '/index.ts': `
       export { test } from "./test";
       export { barrelFileReference } from "./barrelFileReference";
-      export { reExportFromExternalPackage } from "react";
       `,
       '/test.ts': 'export const test = 1;',
       '/barrelFileReference/index.ts':
@@ -49,7 +48,20 @@ describe('getBarrelFileReferencesInFile tests', () => {
 
     assert.deepEqual(getBarrelFileReferencesInFile('/index.ts'), [
       { barrelFilePath: './barrelFileReference/index.ts' },
-      { barrelFilePath: 'react' },
     ]);
+  });
+
+  it('does not return references to external packages', () => {
+    mock({
+      '/index.ts': `
+      export { useEffect } from "react";
+      export { createRoot } from "./createRoot";
+      `,
+      '/createRoot.ts': `
+      export { createRoot } from "react-dom/client";`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getBarrelFileReferencesInFile('/index.ts'), []);
   });
 });
