@@ -99,12 +99,26 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
   traverse(ast, {
     ExportNamedDeclaration(path) {
       if ('declaration' in path.node && path.node.declaration) {
-        const name = getNameFromDeclaration(path.node.declaration);
-        results.definitions.push({
-          type: 'namedExport',
-          name,
-          typeOnly: isTypeOnlyDeclaration(path.node.declaration),
-        });
+        if (path.node.declaration.type === 'VariableDeclaration') {
+          for (const declarator of path.node.declaration.declarations) {
+            const names = babel.types.isPatternLike(declarator.id) ? getIdentifiersFromPattern(declarator.id) : [];
+
+            for (const name of names) {
+              results.definitions.push({
+                type: 'namedExport',
+                name,
+                typeOnly: false,
+              });
+            }
+          }
+        } else {
+          const name = getNameFromDeclaration(path.node.declaration);
+          results.definitions.push({
+            type: 'namedExport',
+            name,
+            typeOnly: isTypeOnlyDeclaration(path.node.declaration),
+          });
+        }
       } else if (path.node.specifiers) {
         if (path.node.specifiers.length > 0) {
           for (const specifier of path.node.specifiers) {
@@ -196,16 +210,34 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
           path.node.type !== 'ExportDefaultDeclaration' &&
           path.node.type !== 'ExportAllDeclaration'
         ) {
-          const name = getNameFromDeclaration(path.node);
-          const candidateExportMatch = exportsToFindInSecondPass.get(name);
-          if (candidateExportMatch) {
-            results.definitions.push({
-              type: 'namedExport',
-              name: candidateExportMatch.exportedName,
-              typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
-            });
+          if (path.node.type === 'VariableDeclaration') {
+            for (const declarator of path.node.declarations) {
+              const names = getIdentifiersFromPattern(declarator.id);
+              for (const name of names) {
+                const candidateExportMatch = exportsToFindInSecondPass.get(name);
+                if (candidateExportMatch) {
+                  results.definitions.push({
+                    type: 'namedExport',
+                    name: candidateExportMatch.exportedName,
+                    typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
+                  });
 
-            exportsToFindInSecondPass.delete(name);
+                  exportsToFindInSecondPass.delete(name);
+                }
+              }
+            }
+          } else {
+            const name = getNameFromDeclaration(path.node);
+            const candidateExportMatch = exportsToFindInSecondPass.get(name);
+            if (candidateExportMatch) {
+              results.definitions.push({
+                type: 'namedExport',
+                name: candidateExportMatch.exportedName,
+                typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
+              });
+
+              exportsToFindInSecondPass.delete(name);
+            }
           }
         }
       },
@@ -221,6 +253,55 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
 
 function getImportedNameFromSpecifier(specifier: babel.types.ImportSpecifier) {
   return specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value;
+}
+
+function getIdentifiersFromPattern(pattern: babel.types.LVal | babel.types.PatternLike): string[] {
+  switch (pattern.type) {
+    case 'Identifier':
+      return [pattern.name];
+    case 'ObjectPattern':
+      return pattern.properties.flatMap((property) => {
+        if (property.type === 'ObjectProperty') {
+          if (property.value.type === 'Identifier') {
+            return [property.value.name];
+          }
+
+          if (babel.types.isPatternLike(property.value)) {
+            return getIdentifiersFromPattern(property.value);
+          }
+
+          return [];
+        }
+
+        if (property.type === 'RestElement') {
+          return getIdentifiersFromPattern(property.argument);
+        }
+
+        return [];
+      });
+    case 'ArrayPattern':
+      return pattern.elements.flatMap((element) => {
+        if (!element) {
+          return [];
+        }
+
+        if (element.type === 'Identifier') {
+          return [element.name];
+        }
+
+        if (element && babel.types.isPatternLike(element)) {
+          return getIdentifiersFromPattern(element);
+        }
+
+        return [];
+      });
+    case 'AssignmentPattern':
+      return getIdentifiersFromPattern(pattern.left);
+    case 'RestElement':
+      return getIdentifiersFromPattern(pattern.argument);
+    default:
+      return [];
+  }
 }
 
 function isTypeOnlyDeclaration(declaration: babel.types.Declaration | babel.types.Expression): boolean {
@@ -243,19 +324,6 @@ function getNameFromDeclaration(declaration: babel.types.Declaration | babel.typ
     }
 
     return declaration.id?.name;
-  }
-
-  if (declaration.type === 'VariableDeclaration') {
-    if (declaration.declarations.length === 0) {
-      throw new Error(`Variable declaration without any declarators found: ${declaration}`);
-    }
-    if (declaration.declarations.length > 1) {
-      throw new Error(`Variable declaration with multiple declarators found: ${declaration}`);
-    }
-    if (!('name' in declaration.declarations[0].id)) {
-      throw new Error(`Variable declaration without name found: ${declaration}`);
-    }
-    return declaration.declarations[0].id.name;
   }
 
   throw new Error(`getNameFromDeclaration currently does not support declaration type: ${declaration.type}`);

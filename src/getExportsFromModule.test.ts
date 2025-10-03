@@ -341,7 +341,7 @@ describe('getExportsFromModule tests', () => {
     });
   });
 
-  it('returns definitions from export statements referencing things defined in the current module ', () => {
+  it('returns definitions from export statements referencing things defined in the current module', () => {
     mock({
       '/index.ts': 'export {} from "./test";',
       '/test.ts': `
@@ -423,5 +423,113 @@ describe('getExportsFromModule tests', () => {
     });
 
     assert.throws(() => getExportsFromModule('/does-not-exist'), `Could not find source for exports: myFunction`);
+  });
+
+  it('is able to handle complex exports', () => {
+    mock({
+      '/test.ts': `
+      
+      function createComplexObject() {
+        return {
+          foo: 42,
+          bar: 13,
+          baz: { deep: 'value' },
+          qux: 'default',
+          alias: 'renamed',
+          nestedArray: ['first', 'skip', 'third', 'rest1', 'rest2'],
+          nestedObject: {
+            nested: {
+              value: 'nestedValue',
+            },
+          },
+        };
+      }
+
+      function createArray() {
+        return ['alpha', 'beta', 'gamma', 'delta'];
+      }
+
+      const {
+        foo,
+        baz: { deep },
+        qux = 'fallback',
+        alias: aliasValue,
+        nestedArray: [firstNested, ...restNested],
+        ...restObj
+      } = createComplexObject();
+
+      const [firstItem, , thirdItem, ...restItems] = createArray();
+
+      const {
+        nestedObject: {
+          nested: { value: nestedValue },
+        },
+      } = createComplexObject();
+
+      export { foo, deep, qux, aliasValue, restObj, firstNested, restNested, firstItem, thirdItem, restItems, nestedValue };
+    `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/test.ts'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'foo',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'deep',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'qux',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'aliasValue',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'firstNested',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'restNested',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'restObj',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'firstItem',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'thirdItem',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'restItems',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'nestedValue',
+        },
+      ],
+      reExports: [],
+    });
   });
 });
