@@ -190,6 +190,7 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
       },
       Declaration(path) {
         if (
+          path.parentPath?.isProgram() && // Only consider top level declarations
           path.node.type !== 'ImportDeclaration' &&
           path.node.type !== 'ExportNamedDeclaration' &&
           path.node.type !== 'ExportDefaultDeclaration' &&
