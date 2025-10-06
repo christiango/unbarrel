@@ -1,2 +1,2 @@
-export { getBarrelFileReferencesInFile } from './getBarrelFileReferencesInFile';
+export { getIssuesInBarrelFile } from './getIssuesInBarrelFile';
 export { getExportsFromModule } from './getExportsFromModule';
