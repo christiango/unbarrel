@@ -214,7 +214,7 @@ describe('getExportsFromModule tests', () => {
     });
   });
 
-  it('handles type only re=exports', () => {
+  it('handles type only re-exports', () => {
     mock({
       '/test.ts': `
       export type { add, addThree } from './math/add';
