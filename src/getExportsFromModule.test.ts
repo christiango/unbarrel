@@ -257,6 +257,7 @@ describe('getExportsFromModule tests', () => {
       ],
     });
   });
+
   it('handles re-exports using import and export', () => {
     mock({
       '/test.ts': `
@@ -408,6 +409,29 @@ describe('getExportsFromModule tests', () => {
         },
       ],
       reExports: [],
+    });
+  });
+
+  it('handles re-exports from barrel files', () => {
+    mock({
+      '/test.ts': `export { reExport1 } from './nested'`,
+      '/nested': {
+        'index.ts': `export const reExport1 = 1;`,
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/test.ts'), {
+      definitions: [],
+      reExports: [
+        {
+          type: 'namedExport',
+          importedName: 'reExport1',
+          exportedName: 'reExport1',
+          importPath: './nested',
+          typeOnly: false,
+        },
+      ],
     });
   });
 
