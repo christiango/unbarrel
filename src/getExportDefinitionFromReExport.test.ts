@@ -126,7 +126,7 @@ describe('getExportDefinitionForReExport', () => {
         nested2: {
           'index.ts': 'export { default } from "./test";',
           'test.ts': `
-            export default const internalName = 1;
+            export default function internalName() {};
           `,
         },
       },
@@ -146,6 +146,38 @@ describe('getExportDefinitionForReExport', () => {
         importPath: './nested1/nested2/test',
         importedName: 'default',
         exportedName: 'finalTest',
+      }
+    );
+  });
+
+  it('handles the case where there are multiple layers of export star', () => {
+    mock({
+      '/index.ts': 'export { finalExport } from "./nested1";',
+      '/nested1': {
+        'index.ts': `export * from "./nested2";`,
+        nested2: {
+          'index.ts': 'export * from "./test";',
+          'test.ts': `
+            export const finalExport = 1;
+          `,
+        },
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'finalExport',
+        exportedName: 'finalExport',
+        importPath: './nested1',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './nested1/nested2/test',
+        importedName: 'finalExport',
+        exportedName: 'finalExport',
       }
     );
   });

@@ -36,7 +36,10 @@ export function getExportDefinitionFromReExport(
         };
       }
     } else if (definition.type === 'defaultExport') {
-      if (reExportToResolve.type === 'namedExport' && reExportToResolve.importedName === 'default') {
+      if (
+        reExportToResolve.type === 'defaultExport' ||
+        (reExportToResolve.type === 'namedExport' && reExportToResolve.importedName === 'default')
+      ) {
         return {
           type: 'resolvedModuleDefinition',
           importPath: reExportToResolve.importPath,
@@ -74,7 +77,17 @@ export function getExportDefinitionFromReExport(
         };
       }
     } else if (reExport.type === 'exportAll') {
-      throw new Error('Need to handle exportAll still');
+      const matchingDefinition = getExportDefinitionFromReExport(importAbsolutePath, {
+        ...reExportToResolve,
+        importPath: reExport.importPath,
+      });
+
+      // Fix up the import path to be relative to the original module and handle any renames
+      return {
+        ...matchingDefinition,
+        importPath: convertToESMImportPath(path.join(reExportToResolve.importPath, matchingDefinition.importPath)),
+        exportedName: reExportToResolve.exportedName,
+      };
     }
   }
 
