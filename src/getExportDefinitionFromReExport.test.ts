@@ -114,4 +114,39 @@ describe('getExportDefinitionForReExport', () => {
       }
     );
   });
+
+  it('handles the case where there are multiple layers of re-exports and renames with defaults', () => {
+    mock({
+      '/index.ts': 'export { default as finalTest } from "./nested1";',
+      '/nested1': {
+        'index.ts': `
+        import { default as nested1 } from "./nested2";
+        export default nested1;
+        `,
+        nested2: {
+          'index.ts': 'export { default } from "./test";',
+          'test.ts': `
+            export default const internalName = 1;
+          `,
+        },
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'default',
+        exportedName: 'finalTest',
+        importPath: './nested1',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './nested1/nested2/test',
+        importedName: 'default',
+        exportedName: 'finalTest',
+      }
+    );
+  });
 });

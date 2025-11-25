@@ -1,4 +1,4 @@
-import { getExportsFromModule, ModuleNamedReExport } from './getExportsFromModule';
+import { getExportsFromModule, ModuleDefaultReExport, ModuleNamedReExport } from './getExportsFromModule';
 import { convertToESMImportPath, getAbsolutePathOfImport } from './importUtils';
 import path from 'node:path';
 
@@ -20,14 +20,14 @@ export interface ResolvedModuleDefinition {
  */
 export function getExportDefinitionFromReExport(
   absolutePathOfModule: string,
-  reExportToResolve: ModuleNamedReExport
+  reExportToResolve: ModuleNamedReExport | ModuleDefaultReExport
 ): ResolvedModuleDefinition {
   const importAbsolutePath = getAbsolutePathOfImport(absolutePathOfModule, reExportToResolve.importPath);
   const exportsInModule = getExportsFromModule(importAbsolutePath);
 
   for (const definition of exportsInModule.definitions) {
     if (definition.type === 'namedExport') {
-      if (definition.name === reExportToResolve.importedName) {
+      if (reExportToResolve.type === 'namedExport' && definition.name === reExportToResolve.importedName) {
         return {
           type: 'resolvedModuleDefinition',
           importPath: reExportToResolve.importPath,
@@ -36,7 +36,7 @@ export function getExportDefinitionFromReExport(
         };
       }
     } else if (definition.type === 'defaultExport') {
-      if (reExportToResolve.importedName === 'default') {
+      if (reExportToResolve.type === 'namedExport' && reExportToResolve.importedName === 'default') {
         return {
           type: 'resolvedModuleDefinition',
           importPath: reExportToResolve.importPath,
@@ -49,7 +49,7 @@ export function getExportDefinitionFromReExport(
 
   for (const reExport of exportsInModule.reExports) {
     if (reExport.type === 'namedExport') {
-      if (reExport.exportedName === reExportToResolve.importedName) {
+      if (reExportToResolve.type === 'namedExport' && reExport.exportedName === reExportToResolve.importedName) {
         const matchingDefinition = getExportDefinitionFromReExport(importAbsolutePath, reExport);
 
         // Fix up the import path to be relative to the original module and handle any renames
@@ -59,10 +59,24 @@ export function getExportDefinitionFromReExport(
           exportedName: reExportToResolve.exportedName,
         };
       }
-    } else {
-      throw new Error('Need to handle default export and export all still');
+    } else if (reExport.type === 'defaultExport') {
+      if (
+        reExportToResolve.type === 'defaultExport' ||
+        (reExportToResolve.type === 'namedExport' && reExportToResolve.importedName === 'default')
+      ) {
+        const matchingDefinition = getExportDefinitionFromReExport(importAbsolutePath, reExport);
+
+        // Fix up the import path to be relative to the original module and handle any renames
+        return {
+          ...matchingDefinition,
+          importPath: convertToESMImportPath(path.join(reExportToResolve.importPath, matchingDefinition.importPath)),
+          exportedName: reExportToResolve.exportedName,
+        };
+      }
+    } else if (reExport.type === 'exportAll') {
+      throw new Error('Need to handle exportAll still');
     }
   }
 
-  throw new Error('Case not handled yet');
+  throw new Error(`Could not resolve re-export ${reExportToResolve.exportedName} from ${absolutePathOfModule}`);
 }
