@@ -577,12 +577,25 @@ describe('getExportsFromModule tests', () => {
         import  { default as import1 } from "./test";
         export default import1;
         `,
+        'index2.ts': `export { default } from "./test";`,
         'test.ts': 'export default test;',
       },
       './node_modules': mock.load('node_modules'),
     });
 
     assert.deepEqual(getExportsFromModule('/test/index.ts'), {
+      definitions: [],
+      reExports: [
+        {
+          type: 'defaultExport',
+          exportedName: 'default',
+          importPath: './test',
+          typeOnly: false,
+        },
+      ],
+    });
+
+    assert.deepEqual(getExportsFromModule('/test/index2.ts'), {
       definitions: [],
       reExports: [
         {

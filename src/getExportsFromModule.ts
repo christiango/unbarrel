@@ -124,13 +124,23 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
           for (const specifier of path.node.specifiers) {
             if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
               if ('source' in path.node && path.node.source) {
-                results.reExports.push({
-                  type: 'namedExport',
-                  importedName: specifier.local.name,
-                  exportedName: specifier.exported.name,
-                  importPath: path.node.source.value,
-                  typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
-                });
+                // Check if this is a default re-export: export { default } from "./module"
+                if (specifier.local.name === 'default' && specifier.exported.name === 'default') {
+                  results.reExports.push({
+                    type: 'defaultExport',
+                    exportedName: 'default',
+                    importPath: path.node.source.value,
+                    typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
+                  });
+                } else {
+                  results.reExports.push({
+                    type: 'namedExport',
+                    importedName: specifier.local.name,
+                    exportedName: specifier.exported.name,
+                    importPath: path.node.source.value,
+                    typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
+                  });
+                }
               } else {
                 exportsToFindInSecondPass.set(specifier.local.name, {
                   importedName: specifier.local.name,
