@@ -32,7 +32,7 @@ export function getExportDefinitionFromReExport(
           type: 'resolvedModuleDefinition',
           importPath: reExportToResolve.importPath,
           importedName: definition.name,
-          exportedName: definition.name,
+          exportedName: reExportToResolve.exportedName,
         };
       }
     } else {
@@ -45,10 +45,11 @@ export function getExportDefinitionFromReExport(
       if (reExport.exportedName === reExportToResolve.importedName) {
         const matchingDefinition = getExportDefinitionFromReExport(importAbsolutePath, reExport);
 
-        // Fix up the import path to be relative to the original module
+        // Fix up the import path to be relative to the original module and handle any renames
         return {
           ...matchingDefinition,
           importPath: convertToESMImportPath(path.join(reExportToResolve.importPath, matchingDefinition.importPath)),
+          exportedName: reExportToResolve.exportedName,
         };
       }
     } else {

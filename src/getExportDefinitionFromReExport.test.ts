@@ -57,4 +57,37 @@ describe('getExportDefinitionForReExport', () => {
       }
     );
   });
+
+  it('handles the case where there are multiple layers of re-exports and renames', () => {
+    mock({
+      '/index.ts': 'export { nested1Test as finalTest } from "./nested1";',
+      '/nested1': {
+        'index.ts': 'export { nested2Test as nested1Test } from "./nested2";',
+        nested2: {
+          'index.ts': 'export { test as nested2Test } from "./test";',
+          'test.ts': `
+            const internalName = 1;
+            export { internalName as test };
+          `,
+        },
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'nested1Test',
+        exportedName: 'finalTest',
+        importPath: './nested1',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './nested1/nested2/test',
+        importedName: 'test',
+        exportedName: 'finalTest',
+      }
+    );
+  });
 });
