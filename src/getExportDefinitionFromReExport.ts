@@ -35,8 +35,15 @@ export function getExportDefinitionFromReExport(
           exportedName: reExportToResolve.exportedName,
         };
       }
-    } else {
-      throw new Error('Need to handle default export still');
+    } else if (definition.type === 'defaultExport') {
+      if (reExportToResolve.importedName === 'default') {
+        return {
+          type: 'resolvedModuleDefinition',
+          importPath: reExportToResolve.importPath,
+          importedName: 'default',
+          exportedName: reExportToResolve.exportedName,
+        };
+      }
     }
   }
 

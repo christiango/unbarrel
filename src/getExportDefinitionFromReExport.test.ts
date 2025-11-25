@@ -28,6 +28,30 @@ describe('getExportDefinitionForReExport', () => {
     );
   });
 
+  it('handles the case where it is re-exporting from the module it is defined in as a default export', () => {
+    mock({
+      '/index.ts': 'export { default as exportedFunction } from "./test";',
+      '/test.ts': 'export default function func1(){};',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'default',
+        exportedName: 'exportedFunction',
+        importPath: './test',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './test',
+        importedName: 'default',
+        exportedName: 'exportedFunction',
+      }
+    );
+  });
+
   it('handles the case where there are multiple layers of re-exports', () => {
     mock({
       '/index.ts': 'export { test1 } from "./nested1";',
