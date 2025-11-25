@@ -97,7 +97,10 @@ describe('getExportsFromModule tests', () => {
       '/defaultClass.ts': 'export default class MyClass {}',
       '/defaultValue.ts': 'export default 42;',
       '/defaultInterface.ts': 'export default interface MyInterface {}',
-
+      '/defaultDefinedElsewhere.ts': `
+      const myValue = 42;
+      export default myValue;
+      `,
       './node_modules': mock.load('node_modules'),
     });
 
@@ -136,6 +139,16 @@ describe('getExportsFromModule tests', () => {
         {
           type: 'defaultExport',
           typeOnly: true,
+        },
+      ],
+      reExports: [],
+    });
+
+    assert.deepEqual(getExportsFromModule('/defaultDefinedElsewhere.ts'), {
+      definitions: [
+        {
+          type: 'defaultExport',
+          typeOnly: false,
         },
       ],
       reExports: [],
@@ -554,6 +567,31 @@ describe('getExportsFromModule tests', () => {
         },
       ],
       reExports: [],
+    });
+  });
+
+  it('correctly classifies default re-exports', () => {
+    mock({
+      '/test': {
+        'index.ts': `
+        import  { default as import1 } from "./test";
+        export default import1;
+        `,
+        'test.ts': 'export default test;',
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/test/index.ts'), {
+      definitions: [],
+      reExports: [
+        {
+          type: 'defaultExport',
+          exportedName: 'default',
+          importPath: './test',
+          typeOnly: false,
+        },
+      ],
     });
   });
 });

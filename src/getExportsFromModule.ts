@@ -145,10 +145,20 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
     },
     ExportDefaultDeclaration(path) {
       if (path.node.declaration) {
-        results.definitions.push({
-          type: 'defaultExport',
-          typeOnly: isTypeOnlyDeclaration(path.node.declaration),
-        });
+        // If the declaration is an identifier, it might be a re-export of an imported value
+        // e.g., import foo from './foo'; export default foo;
+        if (path.node.declaration.type === 'Identifier') {
+          exportsToFindInSecondPass.set(path.node.declaration.name, {
+            importedName: path.node.declaration.name,
+            exportedName: 'default',
+            typeOnly: false,
+          });
+        } else {
+          results.definitions.push({
+            type: 'defaultExport',
+            typeOnly: isTypeOnlyDeclaration(path.node.declaration),
+          });
+        }
       }
     },
     ExportAllDeclaration(path) {
@@ -216,11 +226,19 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
               for (const name of names) {
                 const candidateExportMatch = exportsToFindInSecondPass.get(name);
                 if (candidateExportMatch) {
-                  results.definitions.push({
-                    type: 'namedExport',
-                    name: candidateExportMatch.exportedName,
-                    typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
-                  });
+                  // Check if this is a default export (export default localVar)
+                  if (candidateExportMatch.exportedName === 'default') {
+                    results.definitions.push({
+                      type: 'defaultExport',
+                      typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
+                    });
+                  } else {
+                    results.definitions.push({
+                      type: 'namedExport',
+                      name: candidateExportMatch.exportedName,
+                      typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
+                    });
+                  }
 
                   exportsToFindInSecondPass.delete(name);
                 }
@@ -230,11 +248,19 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
             const name = getNameFromDeclaration(path.node);
             const candidateExportMatch = exportsToFindInSecondPass.get(name);
             if (candidateExportMatch) {
-              results.definitions.push({
-                type: 'namedExport',
-                name: candidateExportMatch.exportedName,
-                typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
-              });
+              // Check if this is a default export (export default localVar)
+              if (candidateExportMatch.exportedName === 'default') {
+                results.definitions.push({
+                  type: 'defaultExport',
+                  typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
+                });
+              } else {
+                results.definitions.push({
+                  type: 'namedExport',
+                  name: candidateExportMatch.exportedName,
+                  typeOnly: candidateExportMatch.typeOnly || isTypeOnlyDeclaration(path.node),
+                });
+              }
 
               exportsToFindInSecondPass.delete(name);
             }
