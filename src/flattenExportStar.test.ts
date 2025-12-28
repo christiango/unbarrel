@@ -9,26 +9,38 @@ describe('flattenExportStar tests', () => {
     mock.restore();
   });
 
-  it('does nothing when the module has no exports', () => {
+  it('returns all exports and re-exports reachable', () => {
     mock({
       '/index.ts': 'export * from "./test";',
       '/test1.ts': `
       export const test = 1;
       export interface TestInterface{}
+      export * from './test2'
       `,
+      '/test2.ts': `
+      export const test2 = 2;
+      export * from './test3'
+      `,
+      '/test3.ts': `
+      export const test3 = 3;
+      export function fn3() {}`,
       './node_modules': mock.load('node_modules'),
     });
 
     assert.deepStrictEqual(flattenExportStar('/index.ts', './test1'), [
       {
-        type: 'namedExport',
+        type: 'resolvedModuleDefinition',
+        importedName: 'test',
+        exportedName: 'test',
+        importPath: './test1',
         typeOnly: false,
-        name: 'test',
       },
       {
-        type: 'namedExport',
+        type: 'resolvedModuleDefinition',
+        importedName: 'TestInterface',
+        exportedName: 'TestInterface',
+        importPath: './test1',
         typeOnly: true,
-        name: 'TestInterface',
       },
     ]);
   });

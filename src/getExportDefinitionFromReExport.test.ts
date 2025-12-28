@@ -24,7 +24,13 @@ describe('getExportDefinitionForReExport', () => {
         importPath: './test',
         typeOnly: false,
       }),
-      { type: 'resolvedModuleDefinition', importPath: './test', importedName: 'test1', exportedName: 'test1' }
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './test',
+        importedName: 'test1',
+        exportedName: 'test1',
+        typeOnly: false,
+      }
     );
   });
 
@@ -48,6 +54,7 @@ describe('getExportDefinitionForReExport', () => {
         importPath: './test',
         importedName: 'default',
         exportedName: 'exportedFunction',
+        typeOnly: false,
       }
     );
   });
@@ -78,6 +85,7 @@ describe('getExportDefinitionForReExport', () => {
         importPath: './nested1/nested2/test',
         importedName: 'test1',
         exportedName: 'test1',
+        typeOnly: false,
       }
     );
   });
@@ -111,6 +119,7 @@ describe('getExportDefinitionForReExport', () => {
         importPath: './nested1/nested2/test',
         importedName: 'test',
         exportedName: 'finalTest',
+        typeOnly: false,
       }
     );
   });
@@ -146,6 +155,7 @@ describe('getExportDefinitionForReExport', () => {
         importPath: './nested1/nested2/test',
         importedName: 'default',
         exportedName: 'finalTest',
+        typeOnly: false,
       }
     );
   });
@@ -178,6 +188,40 @@ describe('getExportDefinitionForReExport', () => {
         importPath: './nested1/nested2/test',
         importedName: 'finalExport',
         exportedName: 'finalExport',
+        typeOnly: false,
+      }
+    );
+  });
+
+  it('handles type only exports', () => {
+    mock({
+      '/index.ts': 'export { finalInterface } from "./nested1";',
+      '/nested1': {
+        'index.ts': `export * from "./nested2";`,
+        nested2: {
+          'index.ts': 'export * from "./test";',
+          'test.ts': `
+            export interface finalInterface {};
+          `,
+        },
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'finalInterface',
+        exportedName: 'finalInterface',
+        importPath: './nested1',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './nested1/nested2/test',
+        importedName: 'finalInterface',
+        exportedName: 'finalInterface',
+        typeOnly: true,
       }
     );
   });

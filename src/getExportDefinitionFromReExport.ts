@@ -11,6 +11,8 @@ export interface ResolvedModuleDefinition {
   importedName: string;
   /** The name of the export in the module where the re-export takes place. This won't match importedName if the re-export renames the module */
   exportedName: string;
+  /** Set to true if the export is a type only export */
+  typeOnly: boolean;
 }
 
 /**
@@ -33,6 +35,7 @@ export function getExportDefinitionFromReExport(
           importPath: reExportToResolve.importPath,
           importedName: definition.name,
           exportedName: reExportToResolve.exportedName,
+          typeOnly: definition.typeOnly,
         };
       }
     } else if (definition.type === 'defaultExport') {
@@ -45,6 +48,7 @@ export function getExportDefinitionFromReExport(
           importPath: reExportToResolve.importPath,
           importedName: 'default',
           exportedName: reExportToResolve.exportedName,
+          typeOnly: reExportToResolve.typeOnly,
         };
       }
     }
@@ -60,6 +64,7 @@ export function getExportDefinitionFromReExport(
           ...matchingDefinition,
           importPath: convertToESMImportPath(path.join(reExportToResolve.importPath, matchingDefinition.importPath)),
           exportedName: reExportToResolve.exportedName,
+          typeOnly: matchingDefinition.typeOnly,
         };
       }
     } else if (reExport.type === 'defaultExport') {
@@ -74,6 +79,7 @@ export function getExportDefinitionFromReExport(
           ...matchingDefinition,
           importPath: convertToESMImportPath(path.join(reExportToResolve.importPath, matchingDefinition.importPath)),
           exportedName: reExportToResolve.exportedName,
+          typeOnly: matchingDefinition.typeOnly,
         };
       }
     } else if (reExport.type === 'exportAll') {
@@ -87,6 +93,7 @@ export function getExportDefinitionFromReExport(
         ...matchingDefinition,
         importPath: convertToESMImportPath(path.join(reExportToResolve.importPath, matchingDefinition.importPath)),
         exportedName: reExportToResolve.exportedName,
+        typeOnly: matchingDefinition.typeOnly,
       };
     }
   }
