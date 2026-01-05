@@ -1,6 +1,7 @@
 import { getExportsFromModule } from './getExportsFromModule';
 import { getAbsolutePathOfImport } from './importUtils';
-import { ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
+import { getExportDefinitionFromReExport, ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
+import { getAllExportDefinitionsReachableFromModule } from './getAllExportDefinitionsReachableFromModule';
 
 /**
  * Takes an export star and gets the list of fully resolved named exports that are currently reachable by the export *
@@ -25,7 +26,23 @@ export function flattenExportStar(absolutePathOfBarrelFile: string, importPath: 
     });
   }
 
-  // TODO: Handle re-exports
+  for (const reExport of moduleExports.reExports) {
+    if (reExport.type === 'exportAll') {
+      result.push(
+        ...getAllExportDefinitionsReachableFromModule(
+          getAbsolutePathOfImport(absolutePathOfBarrelFile, reExport.importPath),
+          absolutePathOfBarrelFile
+        )
+      );
+    } else {
+      result.push(
+        getExportDefinitionFromReExport(
+          getAbsolutePathOfImport(absolutePathOfBarrelFile, reExport.importPath),
+          reExport
+        )
+      );
+    }
+  }
 
   return result;
 }
