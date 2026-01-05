@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { resolveModulePath } from './resolveModulePath';
 
 /**
  * Normalizes any Windows style path separators into POSIX separators so the path can be used in import specifiers.
@@ -40,4 +41,15 @@ export function convertToESMImportPath(relativePath: string): string {
 export function convertAbsolutePathToRelativeImportPath(absolutePath: string, baseDir: string): string {
   const relativePath = path.relative(baseDir, absolutePath);
   return convertToESMImportPath(relativePath);
+}
+
+/**
+ * Given a path to a module and an import within the module, get the absolute path of that import module
+ * @param absolutePathOfModule - the absolute path of the module with the import
+ * @param importPath - the path of the import to convert into an absolute path
+ */
+export function getAbsolutePathOfImport(absolutePathOfModule: string, importPath: string): string {
+  const directoryPath = path.dirname(absolutePathOfModule);
+  const importAbsolutePath = path.resolve(directoryPath, importPath);
+  return resolveModulePath(importAbsolutePath);
 }

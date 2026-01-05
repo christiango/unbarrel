@@ -1,8 +1,14 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import mock from 'mock-fs';
+import fs from 'node:fs';
 
-import { isInternalModule, convertToESMImportPath, convertAbsolutePathToRelativeImportPath } from './importUtils';
+import {
+  isInternalModule,
+  convertToESMImportPath,
+  convertAbsolutePathToRelativeImportPath,
+  getAbsolutePathOfImport,
+} from './importUtils';
 
 describe('importUtils tests', () => {
   afterEach(() => {
@@ -47,6 +53,36 @@ describe('importUtils tests', () => {
       const base = '/project/src';
       const file = '/project/src/utils/helpers.ts';
       assert.equal(convertAbsolutePathToRelativeImportPath(file, base), './utils/helpers.ts');
+    });
+  });
+
+  describe('getAbsolutePathOfImport tests', () => {
+    it('gets the correct absolute paths of imports', () => {
+      mock({
+        '/project': {
+          src: {
+            'index.ts': `
+            export { export1 } from "./test1"
+            export { export2 } from "../test2"
+            export { export3 } from "./nested/test3"
+            export { export4 } from "./nested"
+            `,
+            'test1.ts': 'export const export1 = 25;',
+            nested: {
+              'test3.js': 'export const export3 = 3;',
+              'index.ts': 'export const export4 = 4;',
+            },
+          },
+          'test2.ts': 'export export2= 2',
+        },
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fs.readFileSync('/project/src/index.ts', 'utf-8');
+      assert.equal(getAbsolutePathOfImport('/project/src/index.ts', './test1'), '/project/src/test1.ts');
+      assert.equal(getAbsolutePathOfImport('/project/src/index.ts', '../test2'), '/project/test2.ts');
+      assert.equal(getAbsolutePathOfImport('/project/src/index.ts', './nested/test3'), '/project/src/nested/test3.js');
+      assert.equal(getAbsolutePathOfImport('/project/src/index.ts', './nested'), '/project/src/nested/index.ts');
     });
   });
 });

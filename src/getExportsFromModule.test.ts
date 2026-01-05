@@ -97,7 +97,10 @@ describe('getExportsFromModule tests', () => {
       '/defaultClass.ts': 'export default class MyClass {}',
       '/defaultValue.ts': 'export default 42;',
       '/defaultInterface.ts': 'export default interface MyInterface {}',
-
+      '/defaultDefinedElsewhere.ts': `
+      const myValue = 42;
+      export default myValue;
+      `,
       './node_modules': mock.load('node_modules'),
     });
 
@@ -136,6 +139,16 @@ describe('getExportsFromModule tests', () => {
         {
           type: 'defaultExport',
           typeOnly: true,
+        },
+      ],
+      reExports: [],
+    });
+
+    assert.deepEqual(getExportsFromModule('/defaultDefinedElsewhere.ts'), {
+      definitions: [
+        {
+          type: 'defaultExport',
+          typeOnly: false,
         },
       ],
       reExports: [],
@@ -214,7 +227,7 @@ describe('getExportsFromModule tests', () => {
     });
   });
 
-  it('handles type only re=exports', () => {
+  it('handles type only re-exports', () => {
     mock({
       '/test.ts': `
       export type { add, addThree } from './math/add';
@@ -257,6 +270,7 @@ describe('getExportsFromModule tests', () => {
       ],
     });
   });
+
   it('handles re-exports using import and export', () => {
     mock({
       '/test.ts': `
@@ -411,6 +425,29 @@ describe('getExportsFromModule tests', () => {
     });
   });
 
+  it('handles re-exports from barrel files', () => {
+    mock({
+      '/test.ts': `export { reExport1 } from './nested'`,
+      '/nested': {
+        'index.ts': `export const reExport1 = 1;`,
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/test.ts'), {
+      definitions: [],
+      reExports: [
+        {
+          type: 'namedExport',
+          importedName: 'reExport1',
+          exportedName: 'reExport1',
+          importPath: './nested',
+          typeOnly: false,
+        },
+      ],
+    });
+  });
+
   it('throws an error when it cannot find a reference to an export', () => {
     mock({
       '/test.ts': `
@@ -530,6 +567,44 @@ describe('getExportsFromModule tests', () => {
         },
       ],
       reExports: [],
+    });
+  });
+
+  it('correctly classifies default re-exports', () => {
+    mock({
+      '/test': {
+        'index.ts': `
+        import  { default as import1 } from "./test";
+        export default import1;
+        `,
+        'index2.ts': `export { default } from "./test";`,
+        'test.ts': 'export default test;',
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/test/index.ts'), {
+      definitions: [],
+      reExports: [
+        {
+          type: 'defaultExport',
+          exportedName: 'default',
+          importPath: './test',
+          typeOnly: false,
+        },
+      ],
+    });
+
+    assert.deepEqual(getExportsFromModule('/test/index2.ts'), {
+      definitions: [],
+      reExports: [
+        {
+          type: 'defaultExport',
+          exportedName: 'default',
+          importPath: './test',
+          typeOnly: false,
+        },
+      ],
     });
   });
 });
