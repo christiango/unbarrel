@@ -3,13 +3,11 @@
   "version": "0.0.0",
   "description": "Utilities for optimizing barrel files",
   "main": "lib/index.js",
-  "bin": {
-    "unbarrel": "lib/cli.js"
-  },
+  "bin": "lib/cli.js",
   "scripts": {
     "build": "tsc",
     "bundle": "esbuild ./src/cli.ts --bundle --platform=node --outfile=dist/cli.js",
-    "test": "npm run build && node --test lib/**/*.test.js",
+    "test": "yarn run build && node --test lib/**/*.test.js",
     "prettier:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
     "prettier": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "clean": "node ./scripts/clean.js",
@@ -38,5 +36,6 @@
     "mock-fs": "^5.5.0",
     "prettier": "^2.8.0",
     "typescript": "^5.8.3"
-  }
+  },
+  "packageManager": "yarn@4.12.0"
 }
