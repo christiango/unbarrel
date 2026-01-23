@@ -82,10 +82,22 @@ describe('importUtils tests', () => {
 
       const indexPath = normalizeToPosixPath(path.resolve('/project/src/index.ts'));
       fs.readFileSync(indexPath, 'utf-8');
-      assert.equal(getAbsolutePathOfImport(indexPath, './test1'), normalizeToPosixPath(path.resolve('/project/src/test1.ts')));
-      assert.equal(getAbsolutePathOfImport(indexPath, '../test2'), normalizeToPosixPath(path.resolve('/project/test2.ts')));
-      assert.equal(getAbsolutePathOfImport(indexPath, './nested/test3'), normalizeToPosixPath(path.resolve('/project/src/nested/test3.js')));
-      assert.equal(getAbsolutePathOfImport(indexPath, './nested'), normalizeToPosixPath(path.resolve('/project/src/nested/index.ts')));
+      assert.equal(
+        getAbsolutePathOfImport(indexPath, './test1'),
+        normalizeToPosixPath(path.resolve('/project/src/test1.ts'))
+      );
+      assert.equal(
+        getAbsolutePathOfImport(indexPath, '../test2'),
+        normalizeToPosixPath(path.resolve('/project/test2.ts'))
+      );
+      assert.equal(
+        getAbsolutePathOfImport(indexPath, './nested/test3'),
+        normalizeToPosixPath(path.resolve('/project/src/nested/test3.js'))
+      );
+      assert.equal(
+        getAbsolutePathOfImport(indexPath, './nested'),
+        normalizeToPosixPath(path.resolve('/project/src/nested/index.ts'))
+      );
     });
   });
 });
