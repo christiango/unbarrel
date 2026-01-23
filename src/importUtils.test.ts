@@ -2,12 +2,14 @@ import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import mock from 'mock-fs';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import {
   isInternalModule,
   convertToESMImportPath,
   convertAbsolutePathToRelativeImportPath,
   getAbsolutePathOfImport,
+  normalizeToPosixPath,
 } from './importUtils';
 
 describe('importUtils tests', () => {
@@ -78,11 +80,24 @@ describe('importUtils tests', () => {
         './node_modules': mock.load('node_modules'),
       });
 
-      fs.readFileSync('/project/src/index.ts', 'utf-8');
-      assert.equal(getAbsolutePathOfImport('/project/src/index.ts', './test1'), '/project/src/test1.ts');
-      assert.equal(getAbsolutePathOfImport('/project/src/index.ts', '../test2'), '/project/test2.ts');
-      assert.equal(getAbsolutePathOfImport('/project/src/index.ts', './nested/test3'), '/project/src/nested/test3.js');
-      assert.equal(getAbsolutePathOfImport('/project/src/index.ts', './nested'), '/project/src/nested/index.ts');
+      const indexPath = normalizeToPosixPath(path.resolve('/project/src/index.ts'));
+      fs.readFileSync(indexPath, 'utf-8');
+      assert.equal(
+        getAbsolutePathOfImport(indexPath, './test1'),
+        normalizeToPosixPath(path.resolve('/project/src/test1.ts'))
+      );
+      assert.equal(
+        getAbsolutePathOfImport(indexPath, '../test2'),
+        normalizeToPosixPath(path.resolve('/project/test2.ts'))
+      );
+      assert.equal(
+        getAbsolutePathOfImport(indexPath, './nested/test3'),
+        normalizeToPosixPath(path.resolve('/project/src/nested/test3.js'))
+      );
+      assert.equal(
+        getAbsolutePathOfImport(indexPath, './nested'),
+        normalizeToPosixPath(path.resolve('/project/src/nested/index.ts'))
+      );
     });
   });
 });

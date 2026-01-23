@@ -1,29 +1,25 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { unbarrel } from './unbarrel';
 import * as path from 'path';
+import { fixIssuesInBarrelFile } from './fixIssuesInBarrelFile';
 
 const program = new Command();
 
-program.name('barrel-file-utils').description('Utilities for working with barrel files').version('1.0.0');
+program.name('unbarrel').description('Utilities for working with barrel files').version('0.0.0');
 
 program
-  .command('unbarrel')
-  .description('Convert the first export * statement to export {} in a barrel file')
-  .argument('<rootBarrelFile>', 'Path to the root barrel file to process')
-  .action(async (rootBarrelFile: string) => {
+  .command('fix')
+  .description('Convert all export * from ... statements in a barrel file to explicit exports')
+  .argument('<barrelFile>', 'Path to the barrel file to process')
+  .action((barrelFile: string) => {
     try {
-      // Resolve to absolute path
-      const absolutePath = path.resolve(rootBarrelFile);
-
+      const absolutePath = path.resolve(barrelFile);
       console.log(`Processing barrel file: ${absolutePath}`);
-
-      await unbarrel(absolutePath);
-
-      console.log('✅ Successfully ran unbarrel on the specified file');
+      fixIssuesInBarrelFile(absolutePath);
+      console.log('Successfully fixed barrel file');
     } catch (error) {
-      console.error('❌ Error:', error instanceof Error ? error.message : String(error));
+      console.error('Error:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   });
