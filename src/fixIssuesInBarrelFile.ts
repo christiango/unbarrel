@@ -1,5 +1,121 @@
+import * as fs from 'node:fs';
+import * as babel from '@babel/core';
+import traverse from '@babel/traverse';
+import generate from '@babel/generator';
+import * as t from '@babel/types';
+import { flattenExportStar } from './flattenExportStar';
+import { ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
+import { parseTypescriptFile } from './parseUtils';
+
+/**
+ * Groups resolved exports by their import path
+ */
+function groupExportsByPath(exports: ResolvedModuleDefinition[]): Map<string, ResolvedModuleDefinition[]> {
+  const exportsByPath = new Map<string, ResolvedModuleDefinition[]>();
+  for (const exp of exports) {
+    // Remove file extension for grouping
+    const importPathWithoutExtension = exp.importPath.replace(/\.\w+$/, '');
+    const existing = exportsByPath.get(importPathWithoutExtension) || [];
+    existing.push(exp);
+    exportsByPath.set(importPathWithoutExtension, existing);
+  }
+  return exportsByPath;
+}
+
+/**
+ * Creates export named declaration AST nodes from grouped exports
+ */
+function createExportStatements(exportsByPath: Map<string, ResolvedModuleDefinition[]>): t.ExportNamedDeclaration[] {
+  const statements: t.ExportNamedDeclaration[] = [];
+
+  for (const [importPath, exps] of exportsByPath) {
+    const specifiers = exps.map((e) => {
+      const local = t.identifier(e.importedName);
+      const exported = t.identifier(e.exportedName);
+      const specifier = t.exportSpecifier(local, exported);
+
+      // Set exportKind to 'type' for type-only exports
+      if (e.typeOnly) {
+        specifier.exportKind = 'type';
+      }
+
+      return specifier;
+    });
+
+    const exportDecl = t.exportNamedDeclaration(null, specifiers, t.stringLiteral(importPath));
+
+    statements.push(exportDecl);
+  }
+
+  return statements;
+}
+
+/**
+ * Deduplicates exports by exportedName, keeping the first occurrence
+ */
+function deduplicateExports(exports: ResolvedModuleDefinition[]): ResolvedModuleDefinition[] {
+  const seen = new Set<string>();
+  const result: ResolvedModuleDefinition[] = [];
+
+  for (const exp of exports) {
+    if (!seen.has(exp.exportedName)) {
+      seen.add(exp.exportedName);
+      result.push(exp);
+    }
+  }
+
+  return result;
+}
+
 /**
  * Fixes any issues in the referenced barrel file.
  * @param absoluteFilePath - the absolute path of the barrel file to fix
  */
-export function fixIssuesInBarrelFile(absoluteFilePath: string) {}
+export function fixIssuesInBarrelFile(absoluteFilePath: string) {
+  const ast = parseTypescriptFile(absoluteFilePath);
+
+  // Collect all export star declarations and their flattened exports
+  const exportStarPaths: babel.NodePath<t.ExportAllDeclaration>[] = [];
+  const allFlattenedExports: ResolvedModuleDefinition[] = [];
+
+  traverse(ast, {
+    ExportAllDeclaration(path) {
+      const importPath = path.node.source.value;
+
+      // Flatten the export * into named exports
+      const flattened = flattenExportStar(absoluteFilePath, importPath);
+
+      exportStarPaths.push(path);
+      allFlattenedExports.push(...flattened);
+    },
+  });
+
+  if (exportStarPaths.length === 0) {
+    return;
+  }
+
+  // Deduplicate exports across all export stars
+  const deduplicated = deduplicateExports(allFlattenedExports);
+
+  // Group by import path
+  const grouped = groupExportsByPath(deduplicated);
+
+  // Create replacement export statements
+  const newStatements = createExportStatements(grouped);
+
+  // Replace the first export star with all the new statements
+  exportStarPaths[0].replaceWithMultiple(newStatements);
+
+  // Remove the remaining export stars
+  for (let i = 1; i < exportStarPaths.length; i++) {
+    exportStarPaths[i].remove();
+  }
+
+  // Generate code from modified AST
+  const output = generate(ast, {
+    retainLines: false,
+    comments: true,
+  });
+
+  fs.writeFileSync(absoluteFilePath, output.code, 'utf8');
+}

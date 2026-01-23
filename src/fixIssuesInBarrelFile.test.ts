@@ -34,7 +34,7 @@ describe('fixIssuesInBarrelFiletests', () => {
     assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), 'export { test } from "./test";');
   });
 
-  it('fixes references to other barrel files', () => {
+  it('does not modify files without export * (barrel file references are not fixed)', () => {
     mock({
       '/index.ts': `
       export { test } from "./test";
@@ -42,12 +42,11 @@ describe('fixIssuesInBarrelFiletests', () => {
       `,
       '/test.ts': 'export const test = 1;',
       '/barrelFileReference/index.ts': `
-      export { barrelFileExport, anotherBarrelFileExport } from "./barrelFileReference";
-      export * from "./anotherBarrelFileReference";
+      export { barrelFileExport } from "./barrelFileReference";
+      export { anotherBarrelFileExport } from "./anotherBarrelFileReference";
         `,
       '/barrelFileReference/barrelFileReference.ts': `
       export const barrelFileExport = 12;
-      export const anotherBarrelFileReference = 34;
       `,
       '/barrelFileReference/anotherBarrelFileReference.ts': `
       export const anotherBarrelFileExport = 34;
@@ -58,12 +57,12 @@ describe('fixIssuesInBarrelFiletests', () => {
 
     fixIssuesInBarrelFile('/index.ts');
 
+    // File should remain unchanged since there's no export * to fix
     assert.strictEqual(
       fs.readFileSync('/index.ts', 'utf8'),
       `
       export { test } from "./test";
-      export { barrelFileExport } from "./barrelFileReference";
-      export { anotherBarrelFileExport } from "./barrelFileReference/anotherBarrelFileReference";
+      export { barrelFileExport, anotherBarrelFileExport } from "./barrelFileReference";
       `
     );
   });
@@ -92,9 +91,7 @@ describe('fixIssuesInBarrelFiletests', () => {
 
   it('fixes a barrel file that has an export * in it', () => {
     mock({
-      '/index.ts': `
-      export * from "./test";
-      `,
+      '/index.ts': 'export * from "./test";',
       '/test.ts': `
       export const test = 1;
       export { barrelFileReference } from "./barrelFileReference";
@@ -107,10 +104,94 @@ describe('fixIssuesInBarrelFiletests', () => {
 
     assert.strictEqual(
       fs.readFileSync('/index.ts', 'utf8'),
-      `
-    export { test } from "./test";
-    export { barrelFileReference } from "./barrelFileReference";
-    `
+      'export { test } from "./test";\nexport { barrelFileReference } from "./barrelFileReference";'
+    );
+  });
+
+  it('preserves function definitions, comments, and other non-export-star statements', () => {
+    mock({
+      '/index.ts': `// This is a comment that should be preserved
+export function myFunction() {
+  return 42;
+}
+
+/** JSDoc comment */
+export * from "./test";
+
+export const myConst = 123;`,
+      '/test.ts': `
+      export const test = 1;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `// This is a comment that should be preserved
+export function myFunction() {
+  return 42;
+}
+
+/** JSDoc comment */
+export { test } from "./test";
+export const myConst = 123;`
+    );
+  });
+
+  it('groups multiple exports from the same path into a single export statement', () => {
+    mock({
+      '/index.ts': 'export * from "./utils";',
+      '/utils.ts': `
+export const foo = 1;
+export const bar = 2;
+export type FooType = string;
+export interface BarInterface { value: number }
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // All exports from the same path should be grouped into a single export statement
+    // Type exports should have the 'type' specifier
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      'export { foo, bar, type FooType, type BarInterface } from "./utils";'
+    );
+  });
+
+  it('groups multiple export stars pointing to the same underlying module without duplicates', () => {
+    mock({
+      '/index.ts': `export * from "./a";
+export * from "./b";`,
+      '/a.ts': `
+export { shared, type SharedType } from "./shared";
+export const aOnly = 1;
+      `,
+      '/b.ts': `
+export { shared, type SharedType } from "./shared";
+export const bOnly = 2;
+      `,
+      '/shared.ts': `
+export const shared = "shared value";
+export type SharedType = string;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    const result = fs.readFileSync('/index.ts', 'utf8');
+
+    // Deduplication should result in:
+    // - aOnly from ./a
+    // - shared, type SharedType from ./shared (deduplicated - only appears once even though both a and b re-export from shared)
+    // - bOnly from ./b
+    assert.strictEqual(
+      result,
+      'export { aOnly } from "./a";\nexport { shared, type SharedType } from "./shared";\nexport { bOnly } from "./b";'
     );
   });
 });
