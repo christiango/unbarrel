@@ -1,0 +1,10 @@
+# Build outputs
+lib/
+dist/
+
+# Dependencies
+node_modules/
+
+# Yarn
+.yarn/
+.pnp.*
