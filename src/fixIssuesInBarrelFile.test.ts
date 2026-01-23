@@ -194,4 +194,49 @@ export type SharedType = string;
       'export { aOnly } from "./a";\nexport { shared, type SharedType } from "./shared";\nexport { bOnly } from "./b";'
     );
   });
+
+  it('handles renamed exports and default exports through intermediate barrel files', () => {
+    mock({
+      '/index.ts': 'export * from "./barrel";',
+      '/barrel.ts': `
+// Re-export with rename
+export { originalName as renamedExport } from "./source";
+// Re-export default as named
+export { default as MyComponent } from "./component";
+// Re-export type with rename
+export { type OriginalType as RenamedType } from "./types";
+// Regular re-export for comparison
+export { unchanged } from "./source";
+      `,
+      '/source.ts': `
+export const originalName = "original";
+export const unchanged = "unchanged";
+      `,
+      '/component.ts': `
+const Component = () => null;
+export default Component;
+      `,
+      '/types.ts': `
+export type OriginalType = { id: number };
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    const result = fs.readFileSync('/index.ts', 'utf8');
+
+    // Should preserve the renamed exports:
+    // - originalName as renamedExport from ./source
+    // - default as MyComponent from ./component
+    // - type OriginalType as RenamedType from ./types
+    // - unchanged from ./source
+    assert.ok(result.includes('originalName as renamedExport'), 'Should have renamed export');
+    assert.ok(result.includes('default as MyComponent'), 'Should have default export renamed');
+    assert.ok(result.includes('type OriginalType as RenamedType'), 'Should have renamed type export');
+    assert.ok(result.includes('unchanged'), 'Should have unchanged export');
+    assert.ok(result.includes('from "./source"'), 'Should reference source module');
+    assert.ok(result.includes('from "./component"'), 'Should reference component module');
+    assert.ok(result.includes('from "./types"'), 'Should reference types module');
+  });
 });
