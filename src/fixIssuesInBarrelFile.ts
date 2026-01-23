@@ -13,11 +13,9 @@ import { parseTypescriptFile } from './parseUtils';
 function groupExportsByPath(exports: ResolvedModuleDefinition[]): Map<string, ResolvedModuleDefinition[]> {
   const exportsByPath = new Map<string, ResolvedModuleDefinition[]>();
   for (const exp of exports) {
-    // Remove file extension for grouping
-    const importPathWithoutExtension = exp.importPath.replace(/\.\w+$/, '');
-    const existing = exportsByPath.get(importPathWithoutExtension) || [];
+    const existing = exportsByPath.get(exp.importPath) || [];
     existing.push(exp);
-    exportsByPath.set(importPathWithoutExtension, existing);
+    exportsByPath.set(exp.importPath, existing);
   }
   return exportsByPath;
 }
