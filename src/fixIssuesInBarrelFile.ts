@@ -95,10 +95,7 @@ function fixBarrelFileReferences(
         typeOnly,
       });
 
-      const newSpecifier = t.exportSpecifier(
-        t.identifier(resolved.importedName),
-        t.identifier(resolved.exportedName)
-      );
+      const newSpecifier = t.exportSpecifier(t.identifier(resolved.importedName), t.identifier(resolved.exportedName));
       if (resolved.typeOnly || typeOnly) {
         newSpecifier.exportKind = 'type';
       }
@@ -112,9 +109,7 @@ function fixBarrelFileReferences(
     const newStatements: t.ExportNamedDeclaration[] = [];
 
     if (unchangedSpecifiers.length > 0) {
-      newStatements.push(
-        t.exportNamedDeclaration(null, unchangedSpecifiers, t.stringLiteral(sourcePath))
-      );
+      newStatements.push(t.exportNamedDeclaration(null, unchangedSpecifiers, t.stringLiteral(sourcePath)));
     }
 
     for (const [importPath, specifiers] of resolvedByPath) {
