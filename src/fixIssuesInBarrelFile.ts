@@ -11,65 +11,50 @@ import { parseTypescriptFile } from './parseUtils';
  * Groups resolved exports by their import path
  */
 function groupExportsByPath(exports: ResolvedModuleDefinition[]): Map<string, ResolvedModuleDefinition[]> {
-  const exportsByPath = new Map<string, ResolvedModuleDefinition[]>();
+  const grouped = new Map<string, ResolvedModuleDefinition[]>();
   for (const exp of exports) {
-    const existing = exportsByPath.get(exp.importPath) || [];
-    existing.push(exp);
-    exportsByPath.set(exp.importPath, existing);
+    const list = grouped.get(exp.importPath) || [];
+    list.push(exp);
+    grouped.set(exp.importPath, list);
   }
-  return exportsByPath;
-}
-
-/**
- * Creates export named declaration AST nodes from grouped exports
- */
-function createExportStatements(exportsByPath: Map<string, ResolvedModuleDefinition[]>): t.ExportNamedDeclaration[] {
-  const statements: t.ExportNamedDeclaration[] = [];
-
-  for (const [importPath, exps] of exportsByPath) {
-    const specifiers = exps.map((e) => {
-      const local = t.identifier(e.importedName);
-      const exported = t.identifier(e.exportedName);
-      const specifier = t.exportSpecifier(local, exported);
-
-      // Set exportKind to 'type' for type-only exports
-      if (e.typeOnly) {
-        specifier.exportKind = 'type';
-      }
-
-      return specifier;
-    });
-
-    const exportDecl = t.exportNamedDeclaration(null, specifiers, t.stringLiteral(importPath));
-
-    statements.push(exportDecl);
-  }
-
-  return statements;
+  return grouped;
 }
 
 /**
  * Deduplicates exports by exportedName.
- * When there are multiple exports with the same name, value exports (typeOnly: false)
- * take precedence over type-only exports (typeOnly: true), because a value export
- * can be used as both a value and a type (via typeof).
+ * Value exports take precedence over type-only exports.
  */
 function deduplicateExports(exports: ResolvedModuleDefinition[]): ResolvedModuleDefinition[] {
-  const exportsByName = new Map<string, ResolvedModuleDefinition>();
-
+  const byName = new Map<string, ResolvedModuleDefinition>();
   for (const exp of exports) {
-    const existing = exportsByName.get(exp.exportedName);
-    if (!existing) {
-      // First occurrence of this export name
-      exportsByName.set(exp.exportedName, exp);
-    } else if (existing.typeOnly && !exp.typeOnly) {
-      // Replace type-only export with value export (value takes precedence)
-      exportsByName.set(exp.exportedName, exp);
+    const existing = byName.get(exp.exportedName);
+    if (!existing || (existing.typeOnly && !exp.typeOnly)) {
+      byName.set(exp.exportedName, exp);
     }
-    // Otherwise keep the existing export (either both are same typeOnly, or existing is value and new is type)
   }
+  return Array.from(byName.values());
+}
 
-  return Array.from(exportsByName.values());
+/**
+ * Creates an export specifier AST node from a resolved export
+ */
+function createExportSpecifier(exp: ResolvedModuleDefinition): t.ExportSpecifier {
+  const specifier = t.exportSpecifier(t.identifier(exp.importedName), t.identifier(exp.exportedName));
+  if (exp.typeOnly) {
+    specifier.exportKind = 'type';
+  }
+  return specifier;
+}
+
+interface ExistingNamedExport {
+  path: babel.NodePath<t.ExportNamedDeclaration>;
+  sourcePath: string;
+}
+
+interface ExistingExportInfo {
+  namedExport: ExistingNamedExport;
+  specifierIndex: number;
+  typeOnly: boolean;
 }
 
 /**
@@ -79,20 +64,36 @@ function deduplicateExports(exports: ResolvedModuleDefinition[]): ResolvedModule
 export function fixIssuesInBarrelFile(absoluteFilePath: string) {
   const ast = parseTypescriptFile(absoluteFilePath);
 
-  // Collect all export star declarations and their flattened exports
+  // Collect all exports in a single traverse pass
+  const existingExportsByName = new Map<string, ExistingExportInfo>();
+  const existingStatementsByPath = new Map<string, ExistingNamedExport>();
   const exportStarPaths: babel.NodePath<t.ExportAllDeclaration>[] = [];
   const allFlattenedExports: ResolvedModuleDefinition[] = [];
 
   traverse(ast, {
+    ExportNamedDeclaration(path) {
+      if (!path.node.source) return;
+
+      const namedExport: ExistingNamedExport = {
+        path,
+        sourcePath: path.node.source.value,
+      };
+      existingStatementsByPath.set(namedExport.sourcePath, namedExport);
+
+      path.node.specifiers.forEach((specifier, i) => {
+        if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
+          existingExportsByName.set(specifier.exported.name, {
+            namedExport,
+            specifierIndex: i,
+            typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
+          });
+        }
+      });
+    },
+
     ExportAllDeclaration(path) {
-      const importPath = path.node.source.value;
-
-      // Check if this is `export type *` (type-only export star)
       const isExportTypeStar = path.node.exportKind === 'type';
-
-      // Flatten the export * into named exports
-      const flattened = flattenExportStar(absoluteFilePath, importPath, isExportTypeStar);
-
+      const flattened = flattenExportStar(absoluteFilePath, path.node.source.value, isExportTypeStar);
       exportStarPaths.push(path);
       allFlattenedExports.push(...flattened);
     },
@@ -102,28 +103,57 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
     return;
   }
 
-  // Deduplicate exports across all export stars
+  // Deduplicate and filter exports
   const deduplicated = deduplicateExports(allFlattenedExports);
+  const toRemove: ExistingExportInfo[] = [];
 
-  // Group by import path
-  const grouped = groupExportsByPath(deduplicated);
+  const filteredExports = deduplicated.filter((exp) => {
+    const existing = existingExportsByName.get(exp.exportedName);
+    if (!existing) return true;
 
-  // Create replacement export statements
-  const newStatements = createExportStatements(grouped);
+    // Upgrade type-only to value export
+    if (existing.typeOnly && !exp.typeOnly) {
+      toRemove.push(existing);
+      return true;
+    }
+    return false;
+  });
 
-  // Replace the first export star with all the new statements
-  exportStarPaths[0].replaceWithMultiple(newStatements);
+  // Remove specifiers being upgraded from type to value
+  for (const { namedExport, specifierIndex } of toRemove) {
+    const specifiers = namedExport.path.node.specifiers;
+    if (specifiers.length === 1) {
+      namedExport.path.remove();
+      existingStatementsByPath.delete(namedExport.sourcePath);
+    } else {
+      specifiers.splice(specifierIndex, 1);
+    }
+  }
 
-  // Remove the remaining export stars
+  // Group filtered exports and create/update statements
+  const grouped = groupExportsByPath(filteredExports);
+  const newStatements: t.ExportNamedDeclaration[] = [];
+
+  for (const [importPath, exps] of grouped) {
+    const existing = existingStatementsByPath.get(importPath);
+    if (existing) {
+      existing.path.node.specifiers.push(...exps.map(createExportSpecifier));
+    } else {
+      newStatements.push(t.exportNamedDeclaration(null, exps.map(createExportSpecifier), t.stringLiteral(importPath)));
+    }
+  }
+
+  // Replace export stars
+  if (newStatements.length > 0) {
+    exportStarPaths[0].replaceWithMultiple(newStatements);
+  } else {
+    exportStarPaths[0].remove();
+  }
   for (let i = 1; i < exportStarPaths.length; i++) {
     exportStarPaths[i].remove();
   }
 
-  // Generate code from modified AST
-  const output = generate(ast, {
-    retainLines: false,
-    comments: true,
-  });
-
+  // Write output
+  const output = generate(ast, { retainLines: false, comments: true });
   fs.writeFileSync(absoluteFilePath, output.code, 'utf8');
 }
