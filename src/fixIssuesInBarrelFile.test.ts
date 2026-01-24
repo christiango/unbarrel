@@ -239,6 +239,48 @@ export function myFunction() { return 1; }
     );
   });
 
+  it('does not duplicate exports that already exist as explicit named exports', () => {
+    mock({
+      '/index.ts': `export { type MyProps, MyComponent } from "./component";
+export * from "./component";`,
+      '/component.ts': `
+export interface MyProps { value: number }
+export const MyComponent = () => null;
+export function myFunction() { return 1; }
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    const result = fs.readFileSync('/index.ts', 'utf8');
+
+    // MyProps should only appear once, not duplicated
+    // The explicit type export should be preserved, and export * should only add MyComponent
+    assert.strictEqual(result, `export { type MyProps, MyComponent, myFunction } from "./component";`);
+  });
+
+  it('upgrades existing type export to value export when export star has value', () => {
+    mock({
+      '/index.ts': `export type { Events } from "./events";
+export * from "./events";`,
+      '/events.ts': `
+const Events = { Add: 'ADD', Remove: 'REMOVE' } as const;
+export type Events = (typeof Events)[keyof typeof Events];
+export { Events };
+export const handleEvent = () => {};
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // Events should be exported as a value (not type-only) since the module exports it as a value
+    // The original type-only export should be upgraded to a value export
+    // handleEvent should also be exported, no duplicate exports
+    assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), 'export { Events, handleEvent } from "./events";');
+  });
+
   it('handles renamed exports and default exports through intermediate barrel files', () => {
     mock({
       '/index.ts': 'export * from "./barrel";',
@@ -268,19 +310,12 @@ export type OriginalType = { id: number };
 
     fixIssuesInBarrelFile('/index.ts');
 
-    const result = fs.readFileSync('/index.ts', 'utf8');
-
-    // Should preserve the renamed exports:
-    // - originalName as renamedExport from ./source
-    // - default as MyComponent from ./component
-    // - type OriginalType as RenamedType from ./types
-    // - unchanged from ./source
-    assert.ok(result.includes('originalName as renamedExport'), 'Should have renamed export');
-    assert.ok(result.includes('default as MyComponent'), 'Should have default export renamed');
-    assert.ok(result.includes('type OriginalType as RenamedType'), 'Should have renamed type export');
-    assert.ok(result.includes('unchanged'), 'Should have unchanged export');
-    assert.ok(result.includes('from "./source"'), 'Should reference source module');
-    assert.ok(result.includes('from "./component"'), 'Should reference component module');
-    assert.ok(result.includes('from "./types"'), 'Should reference types module');
+    // Should preserve the renamed exports from each module
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export { originalName as renamedExport, unchanged } from "./source";
+export { default as MyComponent } from "./component";
+export { type OriginalType as RenamedType } from "./types";`
+    );
   });
 });
