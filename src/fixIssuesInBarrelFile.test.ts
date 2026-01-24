@@ -195,6 +195,28 @@ export type SharedType = string;
     );
   });
 
+  it('handles export type * by marking all exports as type-only', () => {
+    mock({
+      '/index.ts': 'export type * from "./types";',
+      '/types.ts': `
+export type MyType = string;
+export interface MyInterface { value: number }
+export const myValue = 42;
+export function myFunction() { return 1; }
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // All exports should be marked as type-only since the original was `export type *`
+    // Even value exports like myValue and myFunction should become type exports
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      'export { type MyType, type MyInterface, type myValue, type myFunction } from "./types";'
+    );
+  });
+
   it('handles renamed exports and default exports through intermediate barrel files', () => {
     mock({
       '/index.ts': 'export * from "./barrel";',

@@ -7,8 +7,13 @@ import { getAllExportDefinitionsReachableFromModule } from './getAllExportDefini
  * Takes an export star and gets the list of fully resolved named exports that are currently reachable by the export *
  * @param absolutePathOfBarrelFile - The absolute path of the barrel file with the export * in it
  * @param importPath - The relative path of the module that is being referenced by the export *
+ * @param isExportTypeStar - If true, all exports will be marked as type-only (for `export type *` statements)
  */
-export function flattenExportStar(absolutePathOfBarrelFile: string, importPath: string): ResolvedModuleDefinition[] {
+export function flattenExportStar(
+  absolutePathOfBarrelFile: string,
+  importPath: string,
+  isExportTypeStar: boolean = false
+): ResolvedModuleDefinition[] {
   const result: ResolvedModuleDefinition[] = [];
 
   const importAbsolutePath = getAbsolutePathOfImport(absolutePathOfBarrelFile, importPath);
@@ -22,25 +27,24 @@ export function flattenExportStar(absolutePathOfBarrelFile: string, importPath: 
       exportedName: importName,
       importedName: importName,
       importPath,
-      typeOnly: definition.typeOnly,
+      // If the export star is type-only, all exports become type-only
+      typeOnly: isExportTypeStar || definition.typeOnly,
     });
   }
 
   for (const reExport of moduleExports.reExports) {
     if (reExport.type === 'exportAll') {
-      result.push(
-        ...getAllExportDefinitionsReachableFromModule(
-          getAbsolutePathOfImport(absolutePathOfBarrelFile, reExport.importPath),
-          absolutePathOfBarrelFile
-        )
+      const reachableExports = getAllExportDefinitionsReachableFromModule(
+        getAbsolutePathOfImport(absolutePathOfBarrelFile, reExport.importPath),
+        absolutePathOfBarrelFile
       );
+      result.push(...reachableExports.map((exp) => ({ ...exp, typeOnly: isExportTypeStar || exp.typeOnly })));
     } else {
-      result.push(
-        getExportDefinitionFromReExport(
-          getAbsolutePathOfImport(absolutePathOfBarrelFile, reExport.importPath),
-          reExport
-        )
+      const resolved = getExportDefinitionFromReExport(
+        getAbsolutePathOfImport(absolutePathOfBarrelFile, reExport.importPath),
+        reExport
       );
+      result.push({ ...resolved, typeOnly: isExportTypeStar || resolved.typeOnly });
     }
   }
 

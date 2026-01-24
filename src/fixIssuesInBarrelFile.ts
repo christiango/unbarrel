@@ -80,8 +80,11 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
     ExportAllDeclaration(path) {
       const importPath = path.node.source.value;
 
+      // Check if this is `export type *` (type-only export star)
+      const isExportTypeStar = path.node.exportKind === 'type';
+
       // Flatten the export * into named exports
-      const flattened = flattenExportStar(absoluteFilePath, importPath);
+      const flattened = flattenExportStar(absoluteFilePath, importPath, isExportTypeStar);
 
       exportStarPaths.push(path);
       allFlattenedExports.push(...flattened);
