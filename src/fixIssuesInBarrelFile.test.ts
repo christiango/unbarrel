@@ -195,6 +195,28 @@ export type SharedType = string;
     );
   });
 
+  it('prefers value exports over type exports when both have the same name', () => {
+    mock({
+      '/index.ts': 'export * from "./snackbar";',
+      '/snackbar.ts': `
+const SnackbarEvents = {
+  Add: 'ADD',
+  Remove: 'REMOVE'
+} as const;
+export type SnackbarEvents = (typeof SnackbarEvents)[keyof typeof SnackbarEvents];
+
+export { SnackbarEvents };
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // SnackbarEvents should NOT be marked as type-only since it's also exported as a value
+    // Value exports take precedence over type exports with the same name
+    assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), 'export { SnackbarEvents } from "./snackbar";');
+  });
+
   it('handles export type * by marking all exports as type-only', () => {
     mock({
       '/index.ts': 'export type * from "./types";',
