@@ -256,6 +256,55 @@ export function myFunction() { return 1; }
     assert.strictEqual(result, `export { type MyProps, MyComponent, myFunction } from "./component";`);
   });
 
+  it('fixes barrel file references alongside export * without duplicating', () => {
+    mock({
+      '/index.ts': `export { foo } from "./barrel";
+export * from "./other";`,
+      '/barrel/index.ts': `export { foo } from "./source";`,
+      '/barrel/source.ts': `export const foo = 1;`,
+      '/other.ts': `
+export const bar = 2;
+export const baz = 3;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // The barrel file reference should be resolved to its true source
+    // The export * should be flattened
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export { foo } from "./barrel/source";
+export { bar, baz } from "./other";`
+    );
+  });
+
+  it('does not duplicate when export * and barrel file reference resolve to same name', () => {
+    mock({
+      '/index.ts': `export { foo } from "./barrel";
+export * from "./a";`,
+      '/barrel/index.ts': `export { foo } from "./source";`,
+      '/barrel/source.ts': `export const foo = 1;`,
+      '/a.ts': `
+export const foo = 2;
+export const bar = 3;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // foo appears in both the barrel file reference and export *
+    // The explicit barrel file reference should be resolved to its true source
+    // The export * should skip foo since it's already exported explicitly
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export { foo } from "./barrel/source";
+export { bar } from "./a";`
+    );
+  });
+
   it('upgrades existing type export to value export when export star has value', () => {
     mock({
       '/index.ts': `export type { Events } from "./events";

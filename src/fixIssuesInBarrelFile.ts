@@ -188,15 +188,16 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
     },
   });
 
-  // Handle barrel file references (without export *)
-  if (exportStarPaths.length === 0 && barrelRefExportsToFix.length > 0) {
+  // Handle barrel file references
+  if (barrelRefExportsToFix.length > 0) {
     fixBarrelFileReferences(absoluteFilePath, barrelRefExportsToFix, barrelFileRefs);
-    const output = generate(ast, { retainLines: false, comments: true });
-    fs.writeFileSync(absoluteFilePath, output.code, 'utf8');
-    return;
   }
 
   if (exportStarPaths.length === 0) {
+    if (barrelRefExportsToFix.length > 0) {
+      const output = generate(ast, { retainLines: false, comments: true });
+      fs.writeFileSync(absoluteFilePath, output.code, 'utf8');
+    }
     return;
   }
 
