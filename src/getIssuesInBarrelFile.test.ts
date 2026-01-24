@@ -118,4 +118,21 @@ describe('getIssuesInBarrelFile tests', () => {
       },
     ]);
   });
+
+  it('detects barrel file references with renamed exports', () => {
+    mock({
+      '/index.ts': `export { foo as bar } from "./barrel";`,
+      '/barrel/index.ts': `export { foo } from "./source";`,
+      '/barrel/source.ts': `export const foo = 1;`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getIssuesInBarrelFile('/index.ts'), [
+      {
+        type: 'barrelFileReference',
+        exportedName: 'bar',
+        barrelFilePath: './barrel/index.ts',
+      },
+    ]);
+  });
 });

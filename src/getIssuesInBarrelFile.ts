@@ -23,6 +23,35 @@ export interface ExportAllError {
 export type BarrelFileIssue = BarrelFileReferenceError | ExportAllError;
 
 /**
+ * Checks if a named re-export is a barrel file reference (i.e., re-exports from an intermediate barrel file
+ * rather than from the module that defines the export).
+ * @param absoluteFilePath - The absolute path of the module containing the re-export
+ * @param importPath - The import path of the re-export (must be an internal/relative path)
+ * @param importedName - The name being imported from the target module
+ * @returns true if this is a barrel file reference
+ */
+export function isBarrelFileReference(absoluteFilePath: string, importPath: string, importedName: string): boolean {
+  const targetFilePath = resolveModulePath(path.resolve(path.dirname(absoluteFilePath), importPath));
+  const targetExports = getExportsFromModule(targetFilePath);
+
+  // Check if the name exists as a definition in the target module
+  const matchingExport = targetExports.definitions.find(
+    (definition) => definition.type === 'namedExport' && definition.name === importedName
+  );
+
+  if (matchingExport) {
+    return false;
+  }
+
+  // Check if it's a re-export from an internal module (barrel file reference)
+  const matchingReExport = targetExports.reExports.find(
+    (reExport) => reExport.type === 'namedExport' && reExport.exportedName === importedName
+  );
+
+  return matchingReExport !== undefined && isInternalModule(matchingReExport.importPath);
+}
+
+/**
  * Analyzes the exports of the provided file and returns any references to barrel files within the current package. External packages are not included.
  * @param absoluteFilePath The absolute path the the file we will analyze
  * @returns An array of barrel file references found in the file
@@ -40,34 +69,20 @@ export function getIssuesInBarrelFile(absoluteFilePath: string): BarrelFileIssue
         barrelFilePath: absoluteFilePath,
       });
     }
-    // Only consider internal modules (relative paths)
-    else if (isInternalModule(reExportToVisit.importPath)) {
-      const potentialBarrelFilePath = resolveModulePath(
-        path.resolve(path.dirname(absoluteFilePath), reExportToVisit.importPath)
-      );
-      const exportsFromPotentialBarrel = getExportsFromModule(potentialBarrelFilePath);
-
-      const matchingExport = exportsFromPotentialBarrel.definitions.find(
-        (definition) => definition.type === 'namedExport' && definition.name === reExportToVisit.exportedName
-      );
-
-      // If we couldn't find a matching named export in the other file that defines the export, it likely is a barrel file reference
-      if (!matchingExport) {
-        const matchingReExport = exportsFromPotentialBarrel.reExports.find(
-          (reExport) => reExport.type === 'namedExport' && reExport.exportedName === reExportToVisit.exportedName
+    // Only consider internal modules (relative paths) and named re-exports
+    else if (reExportToVisit.type === 'namedExport' && isInternalModule(reExportToVisit.importPath)) {
+      if (isBarrelFileReference(absoluteFilePath, reExportToVisit.importPath, reExportToVisit.importedName)) {
+        const potentialBarrelFilePath = resolveModulePath(
+          path.resolve(path.dirname(absoluteFilePath), reExportToVisit.importPath)
         );
-
-        // If it's a re-export from an external package, we don't consider it a barrel file reference
-        if (matchingReExport && isInternalModule(matchingReExport.importPath)) {
-          result.push({
-            type: 'barrelFileReference',
-            exportedName: reExportToVisit.exportedName,
-            barrelFilePath: convertAbsolutePathToRelativeImportPath(
-              potentialBarrelFilePath,
-              path.dirname(absoluteFilePath)
-            ),
-          });
-        }
+        result.push({
+          type: 'barrelFileReference',
+          exportedName: reExportToVisit.exportedName,
+          barrelFilePath: convertAbsolutePathToRelativeImportPath(
+            potentialBarrelFilePath,
+            path.dirname(absoluteFilePath)
+          ),
+        });
       }
     }
   }

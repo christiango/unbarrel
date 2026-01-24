@@ -4,8 +4,10 @@ import traverse from '@babel/traverse';
 import generate from '@babel/generator';
 import * as t from '@babel/types';
 import { flattenExportStar } from './flattenExportStar';
-import { ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
+import { getExportDefinitionFromReExport, ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
 import { parseTypescriptFile } from './parseUtils';
+import { isBarrelFileReference } from './getIssuesInBarrelFile';
+import { isInternalModule } from './importUtils';
 
 /**
  * Groups resolved exports by their import path
@@ -58,37 +60,124 @@ interface ExistingExportInfo {
 }
 
 /**
+ * Fixes barrel file references by resolving exports to their true source
+ */
+function fixBarrelFileReferences(
+  absoluteFilePath: string,
+  nodesToFix: babel.NodePath<t.ExportNamedDeclaration>[],
+  barrelRefNames: Set<string>
+) {
+  for (const nodePath of nodesToFix) {
+    const sourcePath = nodePath.node.source!.value;
+    const resolvedByPath = new Map<string, t.ExportSpecifier[]>();
+    const unchangedSpecifiers: t.ExportSpecifier[] = [];
+
+    for (const specifier of nodePath.node.specifiers) {
+      if (specifier.type !== 'ExportSpecifier' || specifier.exported.type !== 'Identifier') {
+        continue;
+      }
+
+      const exportedName = specifier.exported.name;
+      const importedName = specifier.local.name;
+      const typeOnly = specifier.exportKind === 'type' || nodePath.node.exportKind === 'type';
+
+      if (!barrelRefNames.has(exportedName)) {
+        unchangedSpecifiers.push(specifier);
+        continue;
+      }
+
+      // Resolve this export to its true source
+      const resolved = getExportDefinitionFromReExport(absoluteFilePath, {
+        type: importedName === 'default' ? 'defaultExport' : 'namedExport',
+        importedName,
+        exportedName,
+        importPath: sourcePath,
+        typeOnly,
+      });
+
+      const newSpecifier = t.exportSpecifier(
+        t.identifier(resolved.importedName),
+        t.identifier(resolved.exportedName)
+      );
+      if (resolved.typeOnly || typeOnly) {
+        newSpecifier.exportKind = 'type';
+      }
+
+      const list = resolvedByPath.get(resolved.importPath) || [];
+      list.push(newSpecifier);
+      resolvedByPath.set(resolved.importPath, list);
+    }
+
+    // Build replacement statements
+    const newStatements: t.ExportNamedDeclaration[] = [];
+
+    if (unchangedSpecifiers.length > 0) {
+      newStatements.push(
+        t.exportNamedDeclaration(null, unchangedSpecifiers, t.stringLiteral(sourcePath))
+      );
+    }
+
+    for (const [importPath, specifiers] of resolvedByPath) {
+      newStatements.push(t.exportNamedDeclaration(null, specifiers, t.stringLiteral(importPath)));
+    }
+
+    if (newStatements.length > 0) {
+      nodePath.replaceWithMultiple(newStatements);
+    } else {
+      nodePath.remove();
+    }
+  }
+}
+
+/**
  * Fixes any issues in the referenced barrel file.
  * @param absoluteFilePath - the absolute path of the barrel file to fix
  */
 export function fixIssuesInBarrelFile(absoluteFilePath: string) {
   const ast = parseTypescriptFile(absoluteFilePath);
 
-  // Collect all exports in a single traverse pass
+  // Collect all exports and detect issues in a single traverse pass
   const existingExportsByName = new Map<string, ExistingExportInfo>();
   const existingStatementsByPath = new Map<string, ExistingNamedExport>();
   const exportStarPaths: babel.NodePath<t.ExportAllDeclaration>[] = [];
   const allFlattenedExports: ResolvedModuleDefinition[] = [];
+  const barrelRefExportsToFix: babel.NodePath<t.ExportNamedDeclaration>[] = [];
+  const barrelFileRefs = new Set<string>();
 
   traverse(ast, {
     ExportNamedDeclaration(path) {
       if (!path.node.source) return;
 
+      const sourcePath = path.node.source.value;
       const namedExport: ExistingNamedExport = {
         path,
-        sourcePath: path.node.source.value,
+        sourcePath,
       };
       existingStatementsByPath.set(namedExport.sourcePath, namedExport);
 
+      let hasBarrelRef = false;
       path.node.specifiers.forEach((specifier, i) => {
         if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
-          existingExportsByName.set(specifier.exported.name, {
+          const exportedName = specifier.exported.name;
+          const importedName = specifier.local.name;
+
+          existingExportsByName.set(exportedName, {
             namedExport,
             specifierIndex: i,
             typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
           });
+
+          // Check if this specifier is a barrel file reference
+          if (isInternalModule(sourcePath) && isBarrelFileReference(absoluteFilePath, sourcePath, importedName)) {
+            barrelFileRefs.add(exportedName);
+            hasBarrelRef = true;
+          }
         }
       });
+
+      if (hasBarrelRef) {
+        barrelRefExportsToFix.push(path);
+      }
     },
 
     ExportAllDeclaration(path) {
@@ -98,6 +187,14 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
       allFlattenedExports.push(...flattened);
     },
   });
+
+  // Handle barrel file references (without export *)
+  if (exportStarPaths.length === 0 && barrelRefExportsToFix.length > 0) {
+    fixBarrelFileReferences(absoluteFilePath, barrelRefExportsToFix, barrelFileRefs);
+    const output = generate(ast, { retainLines: false, comments: true });
+    fs.writeFileSync(absoluteFilePath, output.code, 'utf8');
+    return;
+  }
 
   if (exportStarPaths.length === 0) {
     return;
