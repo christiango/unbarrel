@@ -49,20 +49,27 @@ function createExportStatements(exportsByPath: Map<string, ResolvedModuleDefinit
 }
 
 /**
- * Deduplicates exports by exportedName, keeping the first occurrence
+ * Deduplicates exports by exportedName.
+ * When there are multiple exports with the same name, value exports (typeOnly: false)
+ * take precedence over type-only exports (typeOnly: true), because a value export
+ * can be used as both a value and a type (via typeof).
  */
 function deduplicateExports(exports: ResolvedModuleDefinition[]): ResolvedModuleDefinition[] {
-  const seen = new Set<string>();
-  const result: ResolvedModuleDefinition[] = [];
+  const exportsByName = new Map<string, ResolvedModuleDefinition>();
 
   for (const exp of exports) {
-    if (!seen.has(exp.exportedName)) {
-      seen.add(exp.exportedName);
-      result.push(exp);
+    const existing = exportsByName.get(exp.exportedName);
+    if (!existing) {
+      // First occurrence of this export name
+      exportsByName.set(exp.exportedName, exp);
+    } else if (existing.typeOnly && !exp.typeOnly) {
+      // Replace type-only export with value export (value takes precedence)
+      exportsByName.set(exp.exportedName, exp);
     }
+    // Otherwise keep the existing export (either both are same typeOnly, or existing is value and new is type)
   }
 
-  return result;
+  return Array.from(exportsByName.values());
 }
 
 /**
