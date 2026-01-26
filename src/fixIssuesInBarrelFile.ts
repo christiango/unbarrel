@@ -177,7 +177,15 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
 
     ExportAllDeclaration(path) {
       const isExportTypeStar = path.node.exportKind === 'type';
-      const flattened = flattenExportStar(absoluteFilePath, path.node.source.value, isExportTypeStar);
+      const flattened = flattenExportStar(absoluteFilePath, path.node.source.value);
+
+      // If this was an export type * statement, mark all exports as type-only
+      if (isExportTypeStar) {
+        for (const exp of flattened) {
+          exp.typeOnly = true;
+        }
+      }
+
       exportStarPaths.push(path);
       allFlattenedExports.push(...flattened);
     },
