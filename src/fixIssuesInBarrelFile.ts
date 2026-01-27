@@ -41,9 +41,20 @@ function cleanupExportsInAST(ast: babel.types.File) {
         if (existingExportForPath) {
           // If we have seen the same path already, merge the specifiers and remove the current one
           const specifiersSet = new Map<string, t.ExportSpecifier>();
+
           for (const specifier of existingExportForPath.node.specifiers) {
             if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
               specifiersSet.set(specifier.exported.name, specifier);
+            }
+          }
+
+          // If the existing export statement is an export type {} statement, let's switch it to export { type foo } style statements for better merging
+          if (existingExportForPath.node.exportKind === 'type') {
+            existingExportForPath.node.exportKind = 'value';
+            for (const specifier of existingExportForPath.node.specifiers) {
+              if (specifier.type === 'ExportSpecifier') {
+                specifier.exportKind = 'type';
+              }
             }
           }
 
@@ -149,15 +160,20 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
             });
 
             // Add a new export statement to the true path
+            const newSpecifier = t.exportSpecifier(
+              t.identifier(resolvedExport.importedName),
+              t.identifier(resolvedExport.exportedName)
+            );
+
+            // Preserve the type-only flag
+            if (resolvedExport.typeOnly) {
+              newSpecifier.exportKind = 'type';
+            }
+
             exportStatement.nodePath.insertAfter(
               t.exportNamedDeclaration(
                 null,
-                [
-                  t.exportSpecifier(
-                    t.identifier(resolvedExport.importedName),
-                    t.identifier(resolvedExport.exportedName)
-                  ),
-                ],
+                [newSpecifier],
                 t.stringLiteral(resolvedExport.importPath)
               )
             );
