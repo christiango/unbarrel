@@ -171,11 +171,7 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
             }
 
             exportStatement.nodePath.insertAfter(
-              t.exportNamedDeclaration(
-                null,
-                [newSpecifier],
-                t.stringLiteral(resolvedExport.importPath)
-              )
+              t.exportNamedDeclaration(null, [newSpecifier], t.stringLiteral(resolvedExport.importPath))
             );
 
             // Remove the specifier from the current export statement
