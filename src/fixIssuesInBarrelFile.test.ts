@@ -384,8 +384,8 @@ export const anotherBarrelFileExport = 34;
 
     assert.strictEqual(
       fs.readFileSync('/index.ts', 'utf8'),
-      `export { barrelFileExport } from "./barrelFileReference/barrelFileReference";
-export { anotherBarrelFileExport } from "./barrelFileReference/anotherBarrelFileReference";`
+      `export { anotherBarrelFileExport } from "./barrelFileReference/anotherBarrelFileReference";
+export { barrelFileExport } from "./barrelFileReference/barrelFileReference";`
     );
   });
 
@@ -450,6 +450,6 @@ export const bar = 2;
 
     fixIssuesInBarrelFile('/index.ts');
 
-    assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), `export { foo, bar } from "./barrel/shared";`);
+    assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), `export { bar, foo } from "./barrel/shared";`);
   });
 });

@@ -40,7 +40,29 @@ function cleanupExportsInAST(ast: babel.types.File) {
         const existingExportForPath = pathToExportMap.get(path.node.source.value);
         if (existingExportForPath) {
           // If we have seen the same path already, merge the specifiers and remove the current one
-          existingExportForPath.node.specifiers.push(...path.node.specifiers);
+          const specifiersSet = new Map<string, t.ExportSpecifier>();
+          for (const specifier of existingExportForPath.node.specifiers) {
+            if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
+              specifiersSet.set(specifier.exported.name, specifier);
+            }
+          }
+
+          for (const specifier of path.node.specifiers) {
+            if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
+              const exportedName = specifier.exported.name;
+
+              const existingSpecifier = specifiersSet.get(exportedName);
+              if (!existingSpecifier) {
+                specifiersSet.set(exportedName, specifier);
+                existingExportForPath.node.specifiers.push(specifier);
+              } else {
+                // If we've seen the specifier already, we need to make sure that if it was a type only export and this one is a value export we upgrade to a value export
+                if (existingSpecifier.exportKind === 'type' && specifier.exportKind !== 'type') {
+                  existingSpecifier.exportKind = 'value';
+                }
+              }
+            }
+          }
           path.remove();
         } else {
           pathToExportMap.set(path.node.source.value, path);
