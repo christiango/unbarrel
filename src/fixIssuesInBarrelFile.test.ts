@@ -447,4 +447,28 @@ export const bar = 2;
 
     assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), `export { bar, foo } from "./barrel/shared";`);
   });
+
+  it('preserves type exports when merging type-only and value exports from same source', () => {
+    mock({
+      '/index.ts': `export type { TypeA, TypeB } from "./barrel";
+export * from "./barrel";
+export type { TypeF } from "./typeF";`,
+      '/barrel.ts': `
+export type TypeA = string;
+export type TypeB = number;
+export const ValueC = 42;
+      `,
+      '/typeF.ts': `export type TypeF = boolean;`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // Should merge into a single statement with explicit type markers on type-only exports
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export { type TypeA, type TypeB, ValueC } from "./barrel";
+export type { TypeF } from "./typeF";`
+    );
+  });
 });
