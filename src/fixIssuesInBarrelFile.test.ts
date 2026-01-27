@@ -58,8 +58,8 @@ export { barrelFileExport, anotherBarrelFileExport } from "./barrelFileReference
     assert.strictEqual(
       fs.readFileSync('/index.ts', 'utf8'),
       `export { test } from "./test";
-export { barrelFileExport } from "./barrelFileReference/barrelFileReference";
-export { anotherBarrelFileExport } from "./barrelFileReference/anotherBarrelFileExport";`
+export { anotherBarrelFileExport } from "./barrelFileReference/anotherBarrelFileExport";
+export { barrelFileExport } from "./barrelFileReference/barrelFileReference";`
     );
   });
 
