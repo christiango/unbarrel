@@ -4,139 +4,83 @@ import traverse from '@babel/traverse';
 import generate from '@babel/generator';
 import * as t from '@babel/types';
 import { flattenExportStar } from './flattenExportStar';
-import { getExportDefinitionFromReExport, ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
+import { getExportDefinitionFromReExport } from './getExportDefinitionFromReExport';
 import { parseTypescriptFile } from './parseUtils';
 import { isBarrelFileReference } from './getIssuesInBarrelFile';
 import { isInternalModule } from './importUtils';
 
-/**
- * Groups resolved exports by their import path.
- * @param exports - the list of resolved module definitions to group
- * @returns a map from import path to the list of exports from that path
- */
-function groupExportsByPath(exports: ResolvedModuleDefinition[]): Map<string, ResolvedModuleDefinition[]> {
-  const grouped = new Map<string, ResolvedModuleDefinition[]>();
-  for (const exp of exports) {
-    const list = grouped.get(exp.importPath) || [];
-    list.push(exp);
-    grouped.set(exp.importPath, list);
-  }
-  return grouped;
-}
-
-/**
- * Deduplicates exports by exportedName.
- * Value export specifiers take precedence over type-only exports if they both exist.
- * @param exports - the list of resolved module definitions to deduplicate
- * @returns a deduplicated list with value exports taking precedence over type-only exports
- */
-function deduplicateExports(exports: ResolvedModuleDefinition[]): ResolvedModuleDefinition[] {
-  const byName = new Map<string, ResolvedModuleDefinition>();
-  for (const exp of exports) {
-    const existing = byName.get(exp.exportedName);
-    if (!existing || (existing.typeOnly && !exp.typeOnly)) {
-      byName.set(exp.exportedName, exp);
-    }
-  }
-  return Array.from(byName.values());
-}
-
-/**
- * Creates an export specifier AST node from a resolved export.
- * @param exp - the resolved module definition to convert
- * @returns a Babel ExportSpecifier node with the appropriate exportKind if type-only
- */
-function createExportSpecifier(exp: ResolvedModuleDefinition): t.ExportSpecifier {
-  const specifier = t.exportSpecifier(t.identifier(exp.importedName), t.identifier(exp.exportedName));
-  if (exp.typeOnly) {
-    specifier.exportKind = 'type';
-  }
-  return specifier;
-}
-
-interface ExistingNamedExport {
-  path: babel.NodePath<t.ExportNamedDeclaration>;
+interface ExportStartStatement {
+  type: 'exportStar';
   sourcePath: string;
+  nodePath: babel.NodePath<t.ExportAllDeclaration>;
 }
 
-interface ExistingExportInfo {
-  namedExport: ExistingNamedExport;
-  specifierIndex: number;
-  typeOnly: boolean;
+interface ExportNamedDeclarationStatement {
+  type: 'exportNamedDeclaration';
+  sourcePath: string;
+  nodePath: babel.NodePath<t.ExportNamedDeclaration>;
 }
 
-/**
- * Fixes barrel file references by resolving exports to their true source.
- * Modifies the AST in place by replacing export statements that reference barrel files
- * with statements that directly reference the true source modules.
- * @param absoluteFilePath - the absolute path of the file being processed
- * @param nodesToFix - the AST node paths of export statements containing barrel file references
- * @param barrelRefNames - the set of exported names that are barrel file references
- */
-function fixBarrelFileReferences(
-  absoluteFilePath: string,
-  nodesToFix: babel.NodePath<t.ExportNamedDeclaration>[],
-  barrelRefNames: Set<string>
-) {
-  for (const nodePath of nodesToFix) {
-    if (!nodePath.node.source) {
-      throw new Error('Expected ExportNamedDeclaration to have a source');
-    }
+type ExportStatement = ExportStartStatement | ExportNamedDeclarationStatement;
 
-    const sourcePath = nodePath.node.source.value;
-    const resolvedByPath = new Map<string, t.ExportSpecifier[]>();
-    const unchangedSpecifiers: t.ExportSpecifier[] = [];
+/** After all the processing has been done */
+function cleanupExportsInAST(ast: babel.types.File) {
+  // Map to the first export statement with a given path
+  const pathToExportMap = new Map<string, babel.NodePath<t.ExportNamedDeclaration>>();
 
-    for (const specifier of nodePath.node.specifiers) {
-      if (specifier.type !== 'ExportSpecifier' || specifier.exported.type !== 'Identifier') {
-        continue;
+  traverse(ast, {
+    ExportNamedDeclaration(path) {
+      if (path.node.source) {
+        if (path.node.specifiers.length === 0) {
+          // If there are no specifiers left, remove the export statement
+          path.remove();
+          return;
+        }
+
+        const existingExportForPath = pathToExportMap.get(path.node.source.value);
+        if (existingExportForPath) {
+          // If we have seen the same path already, merge the specifiers and remove the current one
+          const specifiersSet = new Map<string, t.ExportSpecifier>();
+
+          for (const specifier of existingExportForPath.node.specifiers) {
+            if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
+              specifiersSet.set(specifier.exported.name, specifier);
+            }
+          }
+
+          // If the existing export statement is an export type {} statement, let's switch it to export { type foo } style statements for better merging
+          if (existingExportForPath.node.exportKind === 'type') {
+            existingExportForPath.node.exportKind = 'value';
+            for (const specifier of existingExportForPath.node.specifiers) {
+              if (specifier.type === 'ExportSpecifier') {
+                specifier.exportKind = 'type';
+              }
+            }
+          }
+
+          for (const specifier of path.node.specifiers) {
+            if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
+              const exportedName = specifier.exported.name;
+
+              const existingSpecifier = specifiersSet.get(exportedName);
+              if (!existingSpecifier) {
+                specifiersSet.set(exportedName, specifier);
+                existingExportForPath.node.specifiers.push(specifier);
+              } else {
+                // If we've seen the specifier already, we need to make sure that if it was a type only export and this one is a value export we upgrade to a value export
+                if (existingSpecifier.exportKind === 'type' && specifier.exportKind !== 'type') {
+                  existingSpecifier.exportKind = 'value';
+                }
+              }
+            }
+          }
+          path.remove();
+        } else {
+          pathToExportMap.set(path.node.source.value, path);
+        }
       }
-
-      const exportedName = specifier.exported.name;
-      const importedName = specifier.local.name;
-      const typeOnly = specifier.exportKind === 'type' || nodePath.node.exportKind === 'type';
-
-      if (!barrelRefNames.has(exportedName)) {
-        unchangedSpecifiers.push(specifier);
-        continue;
-      }
-
-      // Resolve this export to its true source
-      const resolved = getExportDefinitionFromReExport(absoluteFilePath, {
-        type: importedName === 'default' ? 'defaultExport' : 'namedExport',
-        importedName,
-        exportedName,
-        importPath: sourcePath,
-        typeOnly,
-      });
-
-      const newSpecifier = t.exportSpecifier(t.identifier(resolved.importedName), t.identifier(resolved.exportedName));
-      if (resolved.typeOnly || typeOnly) {
-        newSpecifier.exportKind = 'type';
-      }
-
-      const list = resolvedByPath.get(resolved.importPath) || [];
-      list.push(newSpecifier);
-      resolvedByPath.set(resolved.importPath, list);
-    }
-
-    // Build replacement statements
-    const newStatements: t.ExportNamedDeclaration[] = [];
-
-    if (unchangedSpecifiers.length > 0) {
-      newStatements.push(t.exportNamedDeclaration(null, unchangedSpecifiers, t.stringLiteral(sourcePath)));
-    }
-
-    for (const [importPath, specifiers] of resolvedByPath) {
-      newStatements.push(t.exportNamedDeclaration(null, specifiers, t.stringLiteral(importPath)));
-    }
-
-    if (newStatements.length > 0) {
-      nodePath.replaceWithMultiple(newStatements);
-    } else {
-      nodePath.remove();
-    }
-  }
+    },
+  });
 }
 
 /**
@@ -149,128 +93,102 @@ function fixBarrelFileReferences(
 export function fixIssuesInBarrelFile(absoluteFilePath: string) {
   const ast = parseTypescriptFile(absoluteFilePath);
 
-  // Collect all exports and detect issues in a single traverse pass
-  const existingExportsByName = new Map<string, ExistingExportInfo>();
-  const existingStatementsByPath = new Map<string, ExistingNamedExport>();
-  const exportStarPaths: babel.NodePath<t.ExportAllDeclaration>[] = [];
-  const allFlattenedExports: ResolvedModuleDefinition[] = [];
-  const barrelRefExportsToFix: babel.NodePath<t.ExportNamedDeclaration>[] = [];
-  const barrelFileRefs = new Set<string>();
+  const exportStatements: ExportStatement[] = [];
+
+  let astModified = false;
 
   traverse(ast, {
     ExportNamedDeclaration(path) {
       if (!path.node.source) return;
 
       const sourcePath = path.node.source.value;
-      const namedExport: ExistingNamedExport = {
-        path,
-        sourcePath,
-      };
-      existingStatementsByPath.set(namedExport.sourcePath, namedExport);
 
-      let hasBarrelRef = false;
-      path.node.specifiers.forEach((specifier, i) => {
+      exportStatements.push({ type: 'exportNamedDeclaration', sourcePath, nodePath: path });
+    },
+
+    ExportAllDeclaration(path) {
+      exportStatements.push({ type: 'exportStar', sourcePath: path.node.source.value, nodePath: path });
+    },
+  });
+
+  // Now go through all export statements and perform the flattening of export star and resolving of re-exports
+  for (const exportStatement of exportStatements) {
+    if (exportStatement.type === 'exportStar') {
+      const flattened = flattenExportStar(absoluteFilePath, exportStatement.nodePath.node.source.value);
+
+      const exportNamedDeclarations: t.ExportNamedDeclaration[] = [];
+
+      const isTypeOnlyExportStar = exportStatement.nodePath.node.exportKind === 'type';
+
+      for (const resolvedModuleDefinition of flattened) {
+        const specifier = t.exportSpecifier(
+          t.identifier(resolvedModuleDefinition.importedName),
+          t.identifier(resolvedModuleDefinition.exportedName)
+        );
+
+        // For export type star statements, make all the generated specifiers type only
+        if (resolvedModuleDefinition.typeOnly || isTypeOnlyExportStar) {
+          specifier.exportKind = 'type';
+        }
+
+        exportNamedDeclarations.push(
+          t.exportNamedDeclaration(null, [specifier], t.stringLiteral(resolvedModuleDefinition.importPath))
+        );
+      }
+
+      exportStatement.nodePath.replaceWithMultiple(exportNamedDeclarations);
+
+      astModified = true;
+    } else {
+      for (const specifier of exportStatement.nodePath.node.specifiers) {
         if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
           const exportedName = specifier.exported.name;
           const importedName = specifier.local.name;
 
-          existingExportsByName.set(exportedName, {
-            namedExport,
-            specifierIndex: i,
-            typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
-          });
+          // If this export points to another barrel file, let's replace it with a direct reference to the true source module
+          if (
+            isInternalModule(exportStatement.sourcePath) &&
+            isBarrelFileReference(absoluteFilePath, exportStatement.sourcePath, importedName)
+          ) {
+            const typeOnly = specifier.exportKind === 'type' || exportStatement.nodePath.node.exportKind === 'type';
+            const resolvedExport = getExportDefinitionFromReExport(absoluteFilePath, {
+              type: importedName === 'default' ? 'defaultExport' : 'namedExport',
+              importedName,
+              exportedName,
+              importPath: exportStatement.sourcePath,
+              typeOnly,
+            });
 
-          // Check if this specifier is a barrel file reference
-          if (isInternalModule(sourcePath) && isBarrelFileReference(absoluteFilePath, sourcePath, importedName)) {
-            barrelFileRefs.add(exportedName);
-            hasBarrelRef = true;
+            // Add a new export statement to the true path
+            const newSpecifier = t.exportSpecifier(
+              t.identifier(resolvedExport.importedName),
+              t.identifier(resolvedExport.exportedName)
+            );
+
+            // Preserve the type-only flag
+            if (resolvedExport.typeOnly) {
+              newSpecifier.exportKind = 'type';
+            }
+
+            exportStatement.nodePath.insertAfter(
+              t.exportNamedDeclaration(null, [newSpecifier], t.stringLiteral(resolvedExport.importPath))
+            );
+
+            // Remove the specifier from the current export statement
+            exportStatement.nodePath.node.specifiers = exportStatement.nodePath.node.specifiers.filter(
+              (s) => s !== specifier
+            );
+
+            astModified = true;
           }
         }
-      });
-
-      if (hasBarrelRef) {
-        barrelRefExportsToFix.push(path);
       }
-    },
-
-    ExportAllDeclaration(path) {
-      const isExportTypeStar = path.node.exportKind === 'type';
-      const flattened = flattenExportStar(absoluteFilePath, path.node.source.value);
-
-      // If this was an export type * statement, mark all exports as type-only
-      if (isExportTypeStar) {
-        for (const exp of flattened) {
-          exp.typeOnly = true;
-        }
-      }
-
-      exportStarPaths.push(path);
-      allFlattenedExports.push(...flattened);
-    },
-  });
-
-  // Handle barrel file references
-  if (barrelRefExportsToFix.length > 0) {
-    fixBarrelFileReferences(absoluteFilePath, barrelRefExportsToFix, barrelFileRefs);
-  }
-
-  // Handle export star statements
-  if (exportStarPaths.length > 0) {
-    // Deduplicate and filter exports
-    const deduplicated = deduplicateExports(allFlattenedExports);
-    const toRemove: ExistingExportInfo[] = [];
-
-    const filteredExports = deduplicated.filter((exp) => {
-      const existing = existingExportsByName.get(exp.exportedName);
-      if (!existing) return true;
-
-      // Upgrade type-only to value export
-      if (existing.typeOnly && !exp.typeOnly) {
-        toRemove.push(existing);
-        return true;
-      }
-      return false;
-    });
-
-    // Remove specifiers being upgraded from type to value
-    for (const { namedExport, specifierIndex } of toRemove) {
-      const specifiers = namedExport.path.node.specifiers;
-      if (specifiers.length === 1) {
-        namedExport.path.remove();
-        existingStatementsByPath.delete(namedExport.sourcePath);
-      } else {
-        specifiers.splice(specifierIndex, 1);
-      }
-    }
-
-    // Group filtered exports and create/update statements
-    const grouped = groupExportsByPath(filteredExports);
-    const newStatements: t.ExportNamedDeclaration[] = [];
-
-    for (const [importPath, exps] of grouped) {
-      const existing = existingStatementsByPath.get(importPath);
-      if (existing) {
-        existing.path.node.specifiers.push(...exps.map(createExportSpecifier));
-      } else {
-        newStatements.push(
-          t.exportNamedDeclaration(null, exps.map(createExportSpecifier), t.stringLiteral(importPath))
-        );
-      }
-    }
-
-    // Replace export stars
-    if (newStatements.length > 0) {
-      exportStarPaths[0].replaceWithMultiple(newStatements);
-    } else {
-      exportStarPaths[0].remove();
-    }
-    for (let i = 1; i < exportStarPaths.length; i++) {
-      exportStarPaths[i].remove();
     }
   }
 
   // Write output if any changes were made
-  if (barrelRefExportsToFix.length > 0 || exportStarPaths.length > 0) {
+  if (astModified) {
+    cleanupExportsInAST(ast);
     const output = generate(ast, { retainLines: false, comments: true });
     fs.writeFileSync(absoluteFilePath, output.code, 'utf8');
   }

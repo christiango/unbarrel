@@ -16,3 +16,6 @@ lib/
 build/
 *.tsbuildinfo
 dist/
+
+# Claude Code settings
+.claude/settings.local.json
