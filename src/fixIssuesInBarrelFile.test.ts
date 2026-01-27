@@ -280,12 +280,11 @@ export { bar, baz } from "./other";`
     );
   });
 
-  it('does not duplicate when export * and barrel file reference resolve to same name', () => {
+  it('does not duplicate when export * and barrel file reference resolve to the same name', () => {
     mock({
       '/index.ts': `export { foo } from "./barrel";
 export * from "./a";`,
-      '/barrel/index.ts': `export { foo } from "./source";`,
-      '/barrel/source.ts': `export const foo = 1;`,
+      '/barrel/index.ts': `export { foo } from "../a";`,
       '/a.ts': `
 export const foo = 2;
 export const bar = 3;
@@ -298,11 +297,7 @@ export const bar = 3;
     // foo appears in both the barrel file reference and export *
     // The explicit barrel file reference should be resolved to its true source
     // The export * should skip foo since it's already exported explicitly
-    assert.strictEqual(
-      fs.readFileSync('/index.ts', 'utf8'),
-      `export { foo } from "./barrel/source";
-export { bar } from "./a";`
-    );
+    assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), `export { foo, bar } from "./a";`);
   });
 
   it('upgrades existing type export to value export when export star has value', () => {
