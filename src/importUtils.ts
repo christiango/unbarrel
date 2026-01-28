@@ -2,6 +2,15 @@ import path from 'node:path';
 import { resolveModulePath } from './resolveModulePath';
 
 /**
+ * Strips the file extension from a path.
+ * @param filePath The path to strip the extension from
+ */
+export function stripExtension(filePath: string): string {
+  const ext = path.extname(filePath);
+  return ext ? filePath.slice(0, -ext.length) : filePath;
+}
+
+/**
  * Normalizes any Windows style path separators into POSIX separators so the path can be used in import specifiers.
  * @param filePath The path to normalize
  */

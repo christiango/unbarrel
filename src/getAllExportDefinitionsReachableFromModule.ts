@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { getExportDefinitionFromReExport, ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
 import { getExportsFromModule } from './getExportsFromModule';
-import { convertToESMImportPath, getAbsolutePathOfImport } from './importUtils';
+import { convertToESMImportPath, getAbsolutePathOfImport, stripExtension } from './importUtils';
 
 /**
  * Resolves a named re-export to it's source definition
@@ -21,7 +21,7 @@ export function getAllExportDefinitionsReachableFromModule(
   const relativeImportPath =
     absolutePathOfModule === baseModulePath
       ? '.'
-      : convertToESMImportPath(path.relative(baseDir, absolutePathOfModule).replace(/\.\w+$/, ''));
+      : convertToESMImportPath(stripExtension(path.relative(baseDir, absolutePathOfModule)));
 
   for (const definition of exportsInModule.definitions) {
     const importName = definition.type === 'defaultExport' ? 'default' : definition.name;
