@@ -10,6 +10,7 @@ import {
   convertAbsolutePathToRelativeImportPath,
   getAbsolutePathOfImport,
   normalizeToPosixPath,
+  stripExtension,
 } from './importUtils';
 
 describe('importUtils tests', () => {
@@ -98,6 +99,36 @@ describe('importUtils tests', () => {
         getAbsolutePathOfImport(indexPath, './nested'),
         normalizeToPosixPath(path.resolve('/project/src/nested/index.ts'))
       );
+    });
+  });
+
+  describe('stripExtension', () => {
+    it('strips common TypeScript extensions', () => {
+      assert.equal(stripExtension('file.ts'), 'file');
+      assert.equal(stripExtension('file.tsx'), 'file');
+      assert.equal(stripExtension('./path/to/file.ts'), './path/to/file');
+    });
+
+    it('strips common JavaScript extensions', () => {
+      assert.equal(stripExtension('file.js'), 'file');
+      assert.equal(stripExtension('file.jsx'), 'file');
+      assert.equal(stripExtension('./path/to/file.js'), './path/to/file');
+    });
+
+    it('handles files with multiple dots', () => {
+      assert.equal(stripExtension('file.test.ts'), 'file.test');
+      assert.equal(stripExtension('file.spec.js'), 'file.spec');
+      assert.equal(stripExtension('./path/to/file.d.ts'), './path/to/file.d');
+    });
+
+    it('returns path unchanged when no extension', () => {
+      assert.equal(stripExtension('file'), 'file');
+      assert.equal(stripExtension('./path/to/file'), './path/to/file');
+    });
+
+    it('handles dotfiles correctly', () => {
+      assert.equal(stripExtension('.gitignore'), '.gitignore');
+      assert.equal(stripExtension('.env'), '.env');
     });
   });
 });

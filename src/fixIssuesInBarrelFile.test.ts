@@ -471,4 +471,32 @@ export const ValueC = 42;
 export type { TypeF } from "./typeF";`
     );
   });
+
+  it('fixes nested barrel files with relative imports in subdirectories', () => {
+    // This test reproduces a bug where export * from "./subdir" with subdir/index.ts
+    // containing relative imports like "./foo" would incorrectly resolve "./foo"
+    // relative to the root barrel file instead of relative to the subdir/index.ts
+    mock({
+      '/src/index.ts': `export * from "./complianceAndSecurity";`,
+      '/src/complianceAndSecurity/index.ts': `
+export { mergeLicenseFiles, licenseJsonToHTML } from "./licenseJsonToHTML";
+export type { License } from "./licenseJsonToHTML";
+      `,
+      '/src/complianceAndSecurity/licenseJsonToHTML.ts': `
+export function mergeLicenseFiles() { return []; }
+export function licenseJsonToHTML() { return ""; }
+export type License = { name: string };
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/src/index.ts');
+
+    // The exports should be resolved correctly relative to complianceAndSecurity/index.ts
+    // not relative to src/index.ts
+    assert.strictEqual(
+      fs.readFileSync('/src/index.ts', 'utf8'),
+      `export { mergeLicenseFiles, licenseJsonToHTML, type License } from "./complianceAndSecurity/licenseJsonToHTML";`
+    );
+  });
 });
