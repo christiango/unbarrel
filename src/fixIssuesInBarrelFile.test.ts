@@ -549,9 +549,6 @@ module.exports = {
 
     fixIssuesInBarrelFile('/index.ts');
 
-    assert.strictEqual(
-      fs.readFileSync('/index.ts', 'utf8'),
-      `export { add, subtract, multiply } from "./mathUtils";`
-    );
+    assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), `export { add, subtract, multiply } from "./mathUtils";`);
   });
 });
