@@ -499,4 +499,56 @@ export type License = { name: string };
       `export { mergeLicenseFiles, licenseJsonToHTML, type License } from "./complianceAndSecurity/licenseJsonToHTML";`
     );
   });
+
+  it('handles export * pointing to a CommonJS module using exports.name pattern', () => {
+    mock({
+      '/index.ts': `export * from "./cjsUtils";`,
+      '/cjsUtils.js': `
+function isProductionBuild() {
+  return process.env.NODE_ENV === 'production';
+}
+
+function getBuildFlavor() {
+  return isProductionBuild() ? 'release' : 'debug';
+}
+
+exports.isProductionBuild = isProductionBuild;
+exports.getBuildFlavor = getBuildFlavor;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export { isProductionBuild, getBuildFlavor } from "./cjsUtils";`
+    );
+  });
+
+  it('handles export * pointing to a CommonJS module using module.exports pattern', () => {
+    mock({
+      '/index.ts': `export * from "./mathUtils";`,
+      '/mathUtils.js': `
+function add(a, b) {
+  return a + b;
+}
+
+function subtract(a, b) {
+  return a - b;
+}
+
+module.exports = {
+  add,
+  subtract,
+  multiply: function(a, b) { return a * b; }
+};
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), `export { add, subtract, multiply } from "./mathUtils";`);
+  });
 });

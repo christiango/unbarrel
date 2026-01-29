@@ -164,6 +164,54 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
         });
       }
     },
+    // Handle CommonJS exports: exports.name = value
+    ExpressionStatement(path) {
+      const expr = path.node.expression;
+      if (expr.type !== 'AssignmentExpression' || expr.operator !== '=') {
+        return;
+      }
+
+      const left = expr.left;
+      if (left.type !== 'MemberExpression') {
+        return;
+      }
+
+      // Handle: exports.name = value
+      if (left.object.type === 'Identifier' && left.object.name === 'exports' && left.property.type === 'Identifier') {
+        results.definitions.push({
+          type: 'namedExport',
+          name: left.property.name,
+          typeOnly: false,
+        });
+        return;
+      }
+
+      // Handle: module.exports = { ... }
+      if (
+        left.object.type === 'Identifier' &&
+        left.object.name === 'module' &&
+        left.property.type === 'Identifier' &&
+        left.property.name === 'exports'
+      ) {
+        if (expr.right.type === 'ObjectExpression') {
+          for (const prop of expr.right.properties) {
+            if (prop.type === 'ObjectProperty' && prop.key.type === 'Identifier') {
+              results.definitions.push({
+                type: 'namedExport',
+                name: prop.key.name,
+                typeOnly: false,
+              });
+            } else if (prop.type === 'ObjectMethod' && prop.key.type === 'Identifier') {
+              results.definitions.push({
+                type: 'namedExport',
+                name: prop.key.name,
+                typeOnly: false,
+              });
+            }
+          }
+        }
+      }
+    },
   });
 
   if (exportsToFindInSecondPass.size > 0) {
