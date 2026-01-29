@@ -693,4 +693,36 @@ module.exports = {
       reExports: [],
     });
   });
+
+  it('handles CommonJS module.exports with shorthand method syntax', () => {
+    mock({
+      '/mathUtils.js': `
+module.exports = {
+  add(a, b) {
+    return a + b;
+  },
+  subtract(a, b) {
+    return a - b;
+  }
+};
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/mathUtils.js'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'add',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'subtract',
+        },
+      ],
+      reExports: [],
+    });
+  });
 });
