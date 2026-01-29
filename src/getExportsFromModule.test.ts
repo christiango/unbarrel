@@ -607,4 +607,90 @@ describe('getExportsFromModule tests', () => {
       ],
     });
   });
+
+  it('handles CommonJS exports using exports.name = value', () => {
+    mock({
+      '/buildUtils.js': `
+function isProductionBuild() {
+  return process.env.NODE_ENV === 'production';
+}
+
+function getBuildFlavorParam() {
+  return isProductionBuild() ? 'release' : 'debug';
+}
+
+function getRepoRoot() {
+  return process.cwd();
+}
+
+exports.isProductionBuild = isProductionBuild;
+exports.getBuildFlavorParam = getBuildFlavorParam;
+exports.getRepoRoot = getRepoRoot;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/buildUtils.js'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'isProductionBuild',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'getBuildFlavorParam',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'getRepoRoot',
+        },
+      ],
+      reExports: [],
+    });
+  });
+
+  it('handles CommonJS module.exports = { ... } pattern', () => {
+    mock({
+      '/utils.js': `
+function add(a, b) {
+  return a + b;
+}
+
+function subtract(a, b) {
+  return a - b;
+}
+
+module.exports = {
+  add,
+  subtract,
+  multiply: function(a, b) { return a * b; }
+};
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/utils.js'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'add',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'subtract',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'multiply',
+        },
+      ],
+      reExports: [],
+    });
+  });
 });
