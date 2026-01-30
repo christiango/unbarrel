@@ -225,4 +225,36 @@ describe('getExportDefinitionForReExport', () => {
       }
     );
   });
+
+  it('handles nested export star through a file (not index) import', () => {
+    // This tests the case where an intermediate re-export is from a regular file
+    // (e.g., ./helper.ts) rather than a directory import (e.g., ./nested/index.ts).
+    // The getBasePathForJoin function should use path.dirname for file imports.
+    mock({
+      '/index.ts': 'export { myExport } from "./barrel";',
+      '/barrel': {
+        'index.ts': `export * from "./helper";`,
+        'helper.ts': `export * from "./utils";`,
+        'utils.ts': `export const myExport = 1;`,
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'myExport',
+        exportedName: 'myExport',
+        importPath: './barrel',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './barrel/utils',
+        importedName: 'myExport',
+        exportedName: 'myExport',
+        typeOnly: false,
+      }
+    );
+  });
 });
