@@ -551,4 +551,24 @@ module.exports = {
 
     assert.strictEqual(fs.readFileSync('/index.ts', 'utf8'), `export { add, subtract, multiply } from "./mathUtils";`);
   });
+
+  it('fixes barrel file references through a file (not directory) by using the file directory for path resolution', () => {
+    // This test reproduces a bug where re-exporting through a file (not a directory barrel)
+    // would produce incorrect paths like "./DataTypeIconType/view/DataTypeIcons"
+    // instead of "./view/DataTypeIcons"
+    mock({
+      '/index.ts': `export type { DataTypeIconType } from './DataTypeIconType';`,
+      '/DataTypeIconType.ts': `export type { DataTypeIconType } from './view/DataTypeIcons';`,
+      '/view/DataTypeIcons.tsx': `export type DataTypeIconType = 'icon1' | 'icon2';`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // The path should be resolved to ./view/DataTypeIcons, not ./DataTypeIconType/view/DataTypeIcons
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export { type DataTypeIconType } from "./view/DataTypeIcons";`
+    );
+  });
 });
