@@ -257,4 +257,39 @@ describe('getExportDefinitionForReExport', () => {
       }
     );
   });
+
+  it('prefers value exports over type exports when both have the same name', () => {
+    // This tests the case where a module has both a type alias and a const with the
+    // same name (common pattern: const Foo = {...} as const; export type Foo = typeof Foo[...];)
+    // When both are exported, we should prefer the value export over the type-only export.
+    mock({
+      '/index.ts': 'export { SnackbarEvents } from "./model";',
+      '/model.ts': `
+        const SnackbarEvents = {
+          Add: 'ADD',
+          Remove: 'REMOVE'
+        } as const;
+        export type SnackbarEvents = (typeof SnackbarEvents)[keyof typeof SnackbarEvents];
+        export { SnackbarEvents };
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'SnackbarEvents',
+        exportedName: 'SnackbarEvents',
+        importPath: './model',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './model',
+        importedName: 'SnackbarEvents',
+        exportedName: 'SnackbarEvents',
+        typeOnly: false, // Should be value export, not type-only
+      }
+    );
+  });
 });
