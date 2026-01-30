@@ -47,16 +47,25 @@ export function getExportDefinitionFromReExport(
   const importAbsolutePath = getAbsolutePathOfImport(absolutePathOfModule, reExportToResolve.importPath);
   const exportsInModule = getExportsFromModule(importAbsolutePath);
 
+  // Collect all matching definitions - there may be both a value and type export with the same name
+  // (e.g., const Foo = {...} as const; export type Foo = typeof Foo[...]; export { Foo };)
+  let matchingDefinition: ResolvedModuleDefinition | undefined;
+
   for (const definition of exportsInModule.definitions) {
     if (definition.type === 'namedExport') {
       if (reExportToResolve.type === 'namedExport' && definition.name === reExportToResolve.importedName) {
-        return {
+        const candidate: ResolvedModuleDefinition = {
           type: 'resolvedModuleDefinition',
           importPath: reExportToResolve.importPath,
           importedName: definition.name,
           exportedName: reExportToResolve.exportedName,
           typeOnly: definition.typeOnly,
         };
+
+        // Prefer value exports over type-only exports
+        if (!matchingDefinition || (!candidate.typeOnly && matchingDefinition.typeOnly)) {
+          matchingDefinition = candidate;
+        }
       }
     } else if (definition.type === 'defaultExport') {
       if (
@@ -72,6 +81,10 @@ export function getExportDefinitionFromReExport(
         };
       }
     }
+  }
+
+  if (matchingDefinition) {
+    return matchingDefinition;
   }
 
   for (const reExport of exportsInModule.reExports) {
