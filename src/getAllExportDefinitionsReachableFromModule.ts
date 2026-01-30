@@ -43,7 +43,13 @@ export function getAllExportDefinitionsReachableFromModule(
         )
       );
     } else {
-      result.push(getExportDefinitionFromReExport(absolutePathOfModule, reExport));
+      const resolved = getExportDefinitionFromReExport(absolutePathOfModule, reExport);
+      // Fix up the import path to be relative to the base module, not the current module
+      const sourceAbsolutePath = getAbsolutePathOfImport(absolutePathOfModule, resolved.importPath);
+      const fixedImportPath = convertToESMImportPath(
+        stripExtension(path.relative(baseDir, sourceAbsolutePath))
+      );
+      result.push({ ...resolved, importPath: fixedImportPath });
     }
   }
 
