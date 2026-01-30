@@ -3,9 +3,7 @@
   "version": "0.0.0",
   "description": "Utilities for optimizing barrel files",
   "main": "lib/index.js",
-  "bin": {
-    "unbarrel": "lib/cli.js"
-  },
+  "bin": "lib/cli.js",
   "scripts": {
     "build": "tsc",
     "bundle": "esbuild ./src/cli.ts --bundle --platform=node --outfile=dist/cli.js",
