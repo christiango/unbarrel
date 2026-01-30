@@ -15,8 +15,8 @@ export function resolveModulePath(absoluteModulePath: string): string {
     resolvedFilePath = require.resolve(absoluteModulePath);
   } catch {
     // If that fails, try common TypeScript extensions and index files
-    const extensions = ['.ts', '.tsx', '.js', '.jsx'];
-    const indexFiles = ['index.ts', 'index.tsx', 'index.js', 'index.jsx'];
+    const extensions = ['.ts', '.tsx', '.d.ts', '.js', '.jsx'];
+    const indexFiles = ['index.ts', 'index.tsx', 'index.d.ts', 'index.js', 'index.jsx'];
 
     // Try direct file with extensions
     for (const ext of extensions) {

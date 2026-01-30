@@ -52,6 +52,48 @@ describe('resolveModulePath tests', () => {
     assert.equal(resolveModulePath('/dir'), '/dir/index.js');
   });
 
+  it('resolves a .d.ts file when given a path without extension', () => {
+    mock({
+      '/types.d.ts': 'export type Foo = string;',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.equal(resolveModulePath('/types'), '/types.d.ts');
+  });
+
+  it('prefers .ts over .d.ts when both exist', () => {
+    mock({
+      '/module.ts': 'export const x = 1;',
+      '/module.d.ts': 'export type X = number;',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.equal(resolveModulePath('/module'), '/module.ts');
+  });
+
+  it('resolves index.d.ts inside a directory path', () => {
+    mock({
+      '/types-dir': {
+        'index.d.ts': 'export type Bar = number;',
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.equal(resolveModulePath('/types-dir'), '/types-dir/index.d.ts');
+  });
+
+  it('prefers index.ts over index.d.ts when both exist', () => {
+    mock({
+      '/dir': {
+        'index.ts': 'export const y = 2;',
+        'index.d.ts': 'export type Y = number;',
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.equal(resolveModulePath('/dir'), '/dir/index.ts');
+  });
+
   it('throws when the path cannot be resolved', () => {
     mock({
       './node_modules': mock.load('node_modules'),
