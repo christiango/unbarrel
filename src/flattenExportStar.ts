@@ -35,10 +35,7 @@ export function flattenExportStar(absolutePathOfBarrelFile: string, importPath: 
       );
       result.push(...reachableExports.map((exp) => ({ ...exp, typeOnly: exp.typeOnly })));
     } else {
-      const resolved = getExportDefinitionFromReExport(
-        getAbsolutePathOfImport(importAbsolutePath, reExport.importPath),
-        reExport
-      );
+      const resolved = getExportDefinitionFromReExport(importAbsolutePath, reExport);
       // Fix up the import path to be relative to the root barrel file, not the intermediate module.
       const sourceAbsolutePath = getAbsolutePathOfImport(importAbsolutePath, resolved.importPath);
       const fixedImportPath = stripExtension(
