@@ -96,6 +96,65 @@ describe('getAllExportDefinitionsReachableFromModule', () => {
     ]);
   });
 
+  it('handles named re-exports inside export * modules', () => {
+    // This tests the bug where named re-exports inside a module reached via export *
+    // would have their import paths relative to the intermediate module instead of the base module
+    mock({
+      '/index.ts': `
+        export * from './sub';
+      `,
+      '/sub/index.ts': `
+        export { foo } from './source';
+      `,
+      '/sub/source.ts': `
+        export const foo = 1;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(getAllExportDefinitionsReachableFromModule('/index.ts'), [
+      {
+        type: 'resolvedModuleDefinition',
+        // Before the fix, this would incorrectly be './source' (relative to /sub/index.ts)
+        // After the fix, it's correctly './sub/source' (relative to /index.ts)
+        importPath: './sub/source',
+        importedName: 'foo',
+        exportedName: 'foo',
+        typeOnly: false,
+      },
+    ]);
+  });
+
+  it('handles deeply nested named re-exports via export *', () => {
+    // More complex case: multiple levels of export * followed by named re-exports
+    mock({
+      '/index.ts': `
+        export * from './level1';
+      `,
+      '/level1/index.ts': `
+        export * from './level2';
+      `,
+      '/level1/level2/index.ts': `
+        export { bar } from './impl';
+      `,
+      '/level1/level2/impl.ts': `
+        export const bar = 'bar';
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(getAllExportDefinitionsReachableFromModule('/index.ts'), [
+      {
+        type: 'resolvedModuleDefinition',
+        // Should be relative to /index.ts, not /level1/level2/index.ts
+        importPath: './level1/level2/impl',
+        importedName: 'bar',
+        exportedName: 'bar',
+        typeOnly: false,
+      },
+    ]);
+  });
+
   it('handles nested exports', () => {
     mock({
       '/index.ts': `
