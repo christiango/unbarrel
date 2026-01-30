@@ -725,4 +725,189 @@ module.exports = {
       reExports: [],
     });
   });
+
+  it('ignores exports nested inside namespace declarations in d.ts files', () => {
+    mock({
+      '/types.d.ts': `
+declare namespace MyNamespace {
+  export interface Config {
+    value: string;
+  }
+  export function helper(): void;
+  export const VERSION: string;
+}
+
+export { MyNamespace };
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    // The exports inside the namespace (Config, helper, VERSION) should NOT be included
+    // Only the top-level export of MyNamespace itself should be included
+    assert.deepEqual(getExportsFromModule('/types.d.ts'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'MyNamespace',
+        },
+      ],
+      reExports: [],
+    });
+  });
+
+  it('handles exported namespace declarations as type-only', () => {
+    mock({
+      '/types.d.ts': `
+export declare namespace Utils {
+  interface Options {
+    debug: boolean;
+  }
+  function format(value: string): string;
+}
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/types.d.ts'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'Utils',
+        },
+      ],
+      reExports: [],
+    });
+  });
+
+  it('handles declare module with string literal name', () => {
+    mock({
+      '/ambient.d.ts': `
+declare module "my-module" {
+  export interface Config {
+    value: string;
+  }
+  export function init(): void;
+}
+
+export declare namespace LocalNamespace {
+  const value: number;
+}
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    // The declare module "my-module" is an ambient module declaration, not a top-level export
+    // Only the exported LocalNamespace should be included
+    assert.deepEqual(getExportsFromModule('/ambient.d.ts'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'LocalNamespace',
+        },
+      ],
+      reExports: [],
+    });
+  });
+
+  it('handles d.ts file with mixed top-level and nested exports', () => {
+    mock({
+      '/mixed.d.ts': `
+export interface TopLevelInterface {
+  prop: string;
+}
+
+export type TopLevelType = string | number;
+
+export declare namespace NestedStuff {
+  export interface NestedInterface {
+    nested: boolean;
+  }
+  export type NestedType = string;
+  export function nestedFn(): void;
+}
+
+export declare function topLevelFunction(): void;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/mixed.d.ts'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'TopLevelInterface',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'TopLevelType',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'NestedStuff',
+        },
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'topLevelFunction',
+        },
+      ],
+      reExports: [],
+    });
+  });
+
+  it('ignores default exports nested inside namespaces', () => {
+    mock({
+      '/namespace-default.d.ts': `
+declare namespace MyLib {
+  export default function main(): void;
+}
+
+export { MyLib };
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    // The default export inside the namespace should NOT be included
+    assert.deepEqual(getExportsFromModule('/namespace-default.d.ts'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'MyLib',
+        },
+      ],
+      reExports: [],
+    });
+  });
+
+  it('ignores export * nested inside namespaces', () => {
+    mock({
+      '/namespace-reexport.d.ts': `
+declare namespace MyLib {
+  export * from './internal';
+}
+
+export { MyLib };
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    // The export * inside the namespace should NOT be included
+    assert.deepEqual(getExportsFromModule('/namespace-reexport.d.ts'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: true,
+          name: 'MyLib',
+        },
+      ],
+      reExports: [],
+    });
+  });
 });
