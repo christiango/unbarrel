@@ -571,4 +571,27 @@ module.exports = {
       `export { type DataTypeIconType } from "./view/DataTypeIcons";`
     );
   });
+
+  it('correctly resolves named re-exports from subdirectory files when flattening export *', () => {
+    // This test reproduces a bug where export * through a barrel file that has named re-exports
+    // from subdirectory files would produce duplicated path segments like
+    // "./componentEditableUtils/componentEditableUtils/Utils" instead of "./componentEditableUtils/Utils"
+    mock({
+      '/index.ts': `export * from './utilities';`,
+      '/utilities/index.ts': `export { type Parser, getParser } from './componentEditableUtils/Utils';`,
+      '/utilities/componentEditableUtils/Utils.ts': `
+export type Parser = { parse(): void };
+export function getParser() { return null; }
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // The path should be ./utilities/componentEditableUtils/Utils, not duplicated
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export { type Parser, getParser } from "./utilities/componentEditableUtils/Utils";`
+    );
+  });
 });

@@ -93,4 +93,50 @@ describe('flattenExportStar tests', () => {
       },
     ]);
   });
+
+  it('correctly resolves named re-exports from subdirectory files without duplicating path segments', () => {
+    // This test reproduces a bug where flattening export * through a barrel file
+    // that has named re-exports from subdirectory files would produce duplicated
+    // path segments like "./componentEditableUtils/componentEditableUtils/Utils"
+    // instead of "./utilities/componentEditableUtils/Utils"
+    mock({
+      '/index.ts': `export * from './utilities';`,
+      '/utilities/index.ts': `
+        export const utilityFunction = () => {};
+        export { type Parser, getParser } from './componentEditableUtils/Utils';
+      `,
+      '/utilities/componentEditableUtils/Utils.ts': `
+        export type Parser = { parse(): void };
+        export function getParser() { return null; }
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    const result = flattenExportStar('/index.ts', './utilities');
+
+    // The paths should be correct relative to /index.ts
+    assert.deepStrictEqual(result, [
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'utilityFunction',
+        exportedName: 'utilityFunction',
+        importPath: './utilities',
+        typeOnly: false,
+      },
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'Parser',
+        exportedName: 'Parser',
+        importPath: './utilities/componentEditableUtils/Utils',
+        typeOnly: true,
+      },
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'getParser',
+        exportedName: 'getParser',
+        importPath: './utilities/componentEditableUtils/Utils',
+        typeOnly: false,
+      },
+    ]);
+  });
 });
