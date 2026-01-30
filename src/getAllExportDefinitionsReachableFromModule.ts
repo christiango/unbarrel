@@ -46,9 +46,7 @@ export function getAllExportDefinitionsReachableFromModule(
       const resolved = getExportDefinitionFromReExport(absolutePathOfModule, reExport);
       // Fix up the import path to be relative to the base module, not the current module
       const sourceAbsolutePath = getAbsolutePathOfImport(absolutePathOfModule, resolved.importPath);
-      const fixedImportPath = convertToESMImportPath(
-        stripExtension(path.relative(baseDir, sourceAbsolutePath))
-      );
+      const fixedImportPath = convertToESMImportPath(stripExtension(path.relative(baseDir, sourceAbsolutePath)));
       result.push({ ...resolved, importPath: fixedImportPath });
     }
   }
