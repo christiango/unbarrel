@@ -83,6 +83,9 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
 
   traverse(ast, {
     ExportNamedDeclaration(path) {
+      // Only process top-level exports, not exports nested inside namespaces
+      if (!path.parentPath?.isProgram()) return;
+
       if ('declaration' in path.node && path.node.declaration) {
         if (path.node.declaration.type === 'VariableDeclaration') {
           for (const declarator of path.node.declaration.declarations) {
@@ -139,6 +142,9 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
       }
     },
     ExportDefaultDeclaration(path) {
+      // Only process top-level exports, not exports nested inside namespaces
+      if (!path.parentPath?.isProgram()) return;
+
       if (path.node.declaration) {
         // If the declaration is an identifier, it might be a re-export of an imported value
         // e.g., import foo from './foo'; export default foo;
@@ -157,6 +163,9 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
       }
     },
     ExportAllDeclaration(path) {
+      // Only process top-level exports, not exports nested inside namespaces
+      if (!path.parentPath?.isProgram()) return;
+
       if ('source' in path.node && path.node.source) {
         results.reExports.push({
           type: 'exportAll',
@@ -374,7 +383,11 @@ function getIdentifiersFromPattern(pattern: babel.types.LVal | babel.types.Patte
 }
 
 function isTypeOnlyDeclaration(declaration: babel.types.Declaration | babel.types.Expression): boolean {
-  return declaration.type === 'TSTypeAliasDeclaration' || declaration.type === 'TSInterfaceDeclaration';
+  return (
+    declaration.type === 'TSTypeAliasDeclaration' ||
+    declaration.type === 'TSInterfaceDeclaration' ||
+    declaration.type === 'TSModuleDeclaration'
+  );
 }
 /**
  * Extracts the name of a defined function, class, interface, type alias ,etc
@@ -393,6 +406,14 @@ function getNameFromDeclaration(declaration: babel.types.Declaration | babel.typ
     }
 
     return declaration.id?.name;
+  }
+
+  if (declaration.type === 'TSModuleDeclaration') {
+    if (declaration.id.type === 'Identifier') {
+      return declaration.id.name;
+    }
+    // For string literal module declarations like `declare module "foo"`, use the string value
+    return declaration.id.value;
   }
 
   throw new Error(`getNameFromDeclaration currently does not support declaration type: ${declaration.type}`);
