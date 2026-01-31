@@ -4,7 +4,7 @@ import {
   convertAbsolutePathToRelativeImportPath,
   getAbsolutePathOfImport,
   isInternalModule,
-  stripExtension
+  stripExtension,
 } from './importUtils';
 import { getExportDefinitionFromReExport, ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
 import { getAllExportDefinitionsReachableFromModule } from './getAllExportDefinitionsReachableFromModule';
