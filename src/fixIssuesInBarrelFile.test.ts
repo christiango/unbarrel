@@ -594,4 +594,33 @@ export function getParser() { return null; }
       `export { type Parser, getParser } from "./utilities/componentEditableUtils/Utils";`
     );
   });
+
+  it('inlines re-exports from external packages when flattening export * through a barrel file', () => {
+    // This test verifies that when a barrel file re-exports from an external package,
+    // the external package export gets inlined into the root barrel file.
+    // This was previously failing because unbarrel tried to resolve the external package
+    // as a local file path.
+    mock({
+      '/index.ts': `export * from './services';`,
+      '/services/index.ts': `
+export { ServiceConnector } from './ServiceConnector';
+export { configInfo as externalConfigInfo } from '@acme/external-lib';
+export type { ServiceConfig } from './ServiceConnector';
+      `,
+      '/services/ServiceConnector.ts': `
+export class ServiceConnector { connect() {} }
+export type ServiceConfig = { url: string };
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // The external package export should be inlined alongside the local exports
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export { ServiceConnector, type ServiceConfig } from "./services/ServiceConnector";
+export { configInfo as externalConfigInfo } from "@acme/external-lib";`
+    );
+  });
 });

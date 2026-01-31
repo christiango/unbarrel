@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { getExportDefinitionFromReExport, ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
 import { getExportsFromModule } from './getExportsFromModule';
-import { convertToESMImportPath, getAbsolutePathOfImport, stripExtension } from './importUtils';
+import { convertToESMImportPath, getAbsolutePathOfImport, isInternalModule, stripExtension } from './importUtils';
 
 /**
  * Resolves a named re-export to it's source definition
@@ -36,6 +36,10 @@ export function getAllExportDefinitionsReachableFromModule(
 
   for (const reExport of exportsInModule.reExports) {
     if (reExport.type === 'exportAll') {
+      // Skip export * from external packages - we can't enumerate their exports
+      if (!isInternalModule(reExport.importPath)) {
+        continue;
+      }
       result.push(
         ...getAllExportDefinitionsReachableFromModule(
           getAbsolutePathOfImport(absolutePathOfModule, reExport.importPath),
@@ -44,10 +48,15 @@ export function getAllExportDefinitionsReachableFromModule(
       );
     } else {
       const resolved = getExportDefinitionFromReExport(absolutePathOfModule, reExport);
-      // Fix up the import path to be relative to the base module, not the current module
-      const sourceAbsolutePath = getAbsolutePathOfImport(absolutePathOfModule, resolved.importPath);
-      const fixedImportPath = convertToESMImportPath(stripExtension(path.relative(baseDir, sourceAbsolutePath)));
-      result.push({ ...resolved, importPath: fixedImportPath });
+      // If the resolved import path is external, keep it as-is
+      if (!isInternalModule(resolved.importPath)) {
+        result.push(resolved);
+      } else {
+        // Fix up the import path to be relative to the base module, not the current module
+        const sourceAbsolutePath = getAbsolutePathOfImport(absolutePathOfModule, resolved.importPath);
+        const fixedImportPath = convertToESMImportPath(stripExtension(path.relative(baseDir, sourceAbsolutePath)));
+        result.push({ ...resolved, importPath: fixedImportPath });
+      }
     }
   }
 

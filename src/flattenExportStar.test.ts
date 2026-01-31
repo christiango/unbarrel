@@ -139,4 +139,61 @@ describe('flattenExportStar tests', () => {
       },
     ]);
   });
+
+  it('skips export * from external packages', () => {
+    // External packages like 'react' or '@foo/bar' cannot be enumerated,
+    // so export * from them should be skipped rather than causing an error.
+    // The module being flattened (./barrel) has both local exports and external export *.
+    mock({
+      '/index.ts': `export * from './barrel';`,
+      '/barrel.ts': `
+        export const localExport = 1;
+        export * from 'external-package';
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    // Should only include the local export, not crash trying to resolve external-package
+    assert.deepStrictEqual(flattenExportStar('/index.ts', './barrel'), [
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'localExport',
+        exportedName: 'localExport',
+        importPath: './barrel',
+        typeOnly: false,
+      },
+    ]);
+  });
+
+  it('keeps external package paths as-is for named re-exports', () => {
+    // When a barrel file re-exports from an external package via named export,
+    // the import path should be kept as the external package name, not resolved.
+    mock({
+      '/index.ts': `
+        export * from './barrel';
+      `,
+      '/barrel.ts': `
+        export { useState } from 'react';
+        export const localThing = 1;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(flattenExportStar('/index.ts', './barrel'), [
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'localThing',
+        exportedName: 'localThing',
+        importPath: './barrel',
+        typeOnly: false,
+      },
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'useState',
+        exportedName: 'useState',
+        importPath: 'react',
+        typeOnly: false,
+      },
+    ]);
+  });
 });

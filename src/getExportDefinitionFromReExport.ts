@@ -1,5 +1,5 @@
 import { getExportsFromModule, ModuleDefaultReExport, ModuleNamedReExport } from './getExportsFromModule';
-import { convertToESMImportPath, getAbsolutePathOfImport } from './importUtils';
+import { convertToESMImportPath, getAbsolutePathOfImport, isInternalModule } from './importUtils';
 import path from 'node:path';
 
 /**
@@ -44,6 +44,24 @@ export function getExportDefinitionFromReExport(
   absolutePathOfModule: string,
   reExportToResolve: ModuleNamedReExport | ModuleDefaultReExport
 ): ResolvedModuleDefinition {
+  // If the import path is an external package (e.g., 'react', we can't resolve it further.
+  // Just return the re-export info as-is.
+  if (!isInternalModule(reExportToResolve.importPath)) {
+    const importedName =
+      reExportToResolve.type === 'defaultExport'
+        ? 'default'
+        : reExportToResolve.type === 'namedExport'
+        ? reExportToResolve.importedName
+        : 'default';
+    return {
+      type: 'resolvedModuleDefinition',
+      importPath: reExportToResolve.importPath,
+      importedName,
+      exportedName: reExportToResolve.exportedName,
+      typeOnly: reExportToResolve.typeOnly,
+    };
+  }
+
   const importAbsolutePath = getAbsolutePathOfImport(absolutePathOfModule, reExportToResolve.importPath);
   const exportsInModule = getExportsFromModule(importAbsolutePath);
 
