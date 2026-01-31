@@ -101,4 +101,35 @@ describe('resolveModulePath tests', () => {
 
     assert.throws(() => resolveModulePath('/does-not-exist'), /Could not resolve module: \/does-not-exist/);
   });
+
+  it('resolves a .ts file when import path has .js extension (ESM pattern)', () => {
+    // TypeScript/ESM allows importing with .js extension even when source is .ts
+    // e.g., import { foo } from './module.js' where the actual file is module.ts
+    mock({
+      '/src/utils.ts': 'export function helper() { return 1; }',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.equal(resolveModulePath('/src/utils.js'), '/src/utils.ts');
+  });
+
+  it('resolves a .tsx file when import path has .jsx extension', () => {
+    mock({
+      '/src/Component.tsx': 'export const Component = () => null;',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.equal(resolveModulePath('/src/Component.jsx'), '/src/Component.tsx');
+  });
+
+  it('prefers actual .js file over .ts when .js extension is specified and both exist', () => {
+    mock({
+      '/src/module.js': 'module.exports = { x: 1 };',
+      '/src/module.ts': 'export const x = 1;',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    // If the .js file actually exists, use it
+    assert.equal(resolveModulePath('/src/module.js'), '/src/module.js');
+  });
 });
