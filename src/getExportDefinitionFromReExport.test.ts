@@ -292,4 +292,30 @@ describe('getExportDefinitionForReExport', () => {
       }
     );
   });
+
+  it('handles re-exports from external packages without trying to resolve them', () => {
+    // External packages (like '@foo/bar') should not be resolved as local files.
+    // The function should return the external path as-is.
+    mock({
+      '/index.ts': 'export { registryInfo as syncbridgeRegistryInfo } from "@foo/bar";',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'registryInfo',
+        exportedName: 'syncbridgeRegistryInfo',
+        importPath: '@foo/bar',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: '@foo/bar',
+        importedName: 'registryInfo',
+        exportedName: 'syncbridgeRegistryInfo',
+        typeOnly: false,
+      }
+    );
+  });
 });

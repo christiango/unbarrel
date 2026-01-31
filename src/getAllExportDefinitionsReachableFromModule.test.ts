@@ -221,4 +221,57 @@ describe('getAllExportDefinitionsReachableFromModule', () => {
       },
     ]);
   });
+
+  it('skips export * from external packages', () => {
+    // External packages like 'react' or '@foo/bar' cannot be enumerated,
+    // so export * from them should be skipped rather than causing an error.
+    mock({
+      '/index.ts': `
+        export * from './local';
+        export * from 'external-package';
+      `,
+      '/local.ts': `export const localExport = 1;`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    // Should only include the local export, not crash trying to resolve external-package
+    assert.deepStrictEqual(getAllExportDefinitionsReachableFromModule('/index.ts'), [
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'localExport',
+        exportedName: 'localExport',
+        importPath: './local',
+        typeOnly: false,
+      },
+    ]);
+  });
+
+  it('keeps external package paths as-is for named re-exports', () => {
+    // When a module re-exports from an external package via named export,
+    // the import path should be kept as the external package name, not resolved.
+    mock({
+      '/index.ts': `
+        export { useState } from 'react';
+        export const localThing = 1;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(getAllExportDefinitionsReachableFromModule('/index.ts'), [
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'localThing',
+        exportedName: 'localThing',
+        importPath: '.',
+        typeOnly: false,
+      },
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'useState',
+        exportedName: 'useState',
+        importPath: 'react',
+        typeOnly: false,
+      },
+    ]);
+  });
 });

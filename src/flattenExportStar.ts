@@ -1,6 +1,11 @@
 import path from 'node:path';
 import { getExportsFromModule } from './getExportsFromModule';
-import { convertAbsolutePathToRelativeImportPath, getAbsolutePathOfImport, stripExtension } from './importUtils';
+import {
+  convertAbsolutePathToRelativeImportPath,
+  getAbsolutePathOfImport,
+  isInternalModule,
+  stripExtension,
+} from './importUtils';
 import { getExportDefinitionFromReExport, ResolvedModuleDefinition } from './getExportDefinitionFromReExport';
 import { getAllExportDefinitionsReachableFromModule } from './getAllExportDefinitionsReachableFromModule';
 
@@ -29,6 +34,10 @@ export function flattenExportStar(absolutePathOfBarrelFile: string, importPath: 
 
   for (const reExport of moduleExports.reExports) {
     if (reExport.type === 'exportAll') {
+      // Skip export * from external packages - we can't enumerate their exports
+      if (!isInternalModule(reExport.importPath)) {
+        continue;
+      }
       const reachableExports = getAllExportDefinitionsReachableFromModule(
         getAbsolutePathOfImport(importAbsolutePath, reExport.importPath),
         absolutePathOfBarrelFile
@@ -36,12 +45,17 @@ export function flattenExportStar(absolutePathOfBarrelFile: string, importPath: 
       result.push(...reachableExports.map((exp) => ({ ...exp, typeOnly: exp.typeOnly })));
     } else {
       const resolved = getExportDefinitionFromReExport(importAbsolutePath, reExport);
-      // Fix up the import path to be relative to the root barrel file, not the intermediate module.
-      const sourceAbsolutePath = getAbsolutePathOfImport(importAbsolutePath, resolved.importPath);
-      const fixedImportPath = stripExtension(
-        convertAbsolutePathToRelativeImportPath(sourceAbsolutePath, path.dirname(absolutePathOfBarrelFile))
-      );
-      result.push({ ...resolved, importPath: fixedImportPath, typeOnly: resolved.typeOnly });
+      // If the resolved import path is external, keep it as-is
+      if (!isInternalModule(resolved.importPath)) {
+        result.push(resolved);
+      } else {
+        // Fix up the import path to be relative to the root barrel file, not the intermediate module.
+        const sourceAbsolutePath = getAbsolutePathOfImport(importAbsolutePath, resolved.importPath);
+        const fixedImportPath = stripExtension(
+          convertAbsolutePathToRelativeImportPath(sourceAbsolutePath, path.dirname(absolutePathOfBarrelFile))
+        );
+        result.push({ ...resolved, importPath: fixedImportPath, typeOnly: resolved.typeOnly });
+      }
     }
   }
 
