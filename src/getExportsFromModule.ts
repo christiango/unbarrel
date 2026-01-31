@@ -320,6 +320,30 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
         }
       },
     });
+
+    // Handle the case where export default X (or export { X }) references a named export from this module
+    // e.g., export const Foo = ...; export default Foo;
+    for (const [localName, exportInfo] of exportsToFindInSecondPass) {
+      const matchingNamedExport = results.definitions.find(
+        (def) => def.type === 'namedExport' && def.name === localName
+      );
+      if (matchingNamedExport) {
+        // The export references a named export already defined in this file
+        if (exportInfo.exportedName === 'default') {
+          results.definitions.push({
+            type: 'defaultExport',
+            typeOnly: exportInfo.typeOnly || matchingNamedExport.typeOnly,
+          });
+        } else {
+          results.definitions.push({
+            type: 'namedExport',
+            name: exportInfo.exportedName,
+            typeOnly: exportInfo.typeOnly || matchingNamedExport.typeOnly,
+          });
+        }
+        exportsToFindInSecondPass.delete(localName);
+      }
+    }
   }
 
   if (exportsToFindInSecondPass.size !== 0) {
