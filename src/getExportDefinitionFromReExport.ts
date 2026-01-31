@@ -109,12 +109,21 @@ export function getExportDefinitionFromReExport(
     if (reExport.type === 'namedExport') {
       if (reExportToResolve.type === 'namedExport' && reExport.exportedName === reExportToResolve.importedName) {
         const matchingDefinition = getExportDefinitionFromReExport(importAbsolutePath, reExport);
-        const basePath = getBasePathForJoin(reExportToResolve.importPath, importAbsolutePath);
+
+        // If the resolved import path is external, keep it as-is (don't join with local path)
+        const resolvedImportPath = !isInternalModule(matchingDefinition.importPath)
+          ? matchingDefinition.importPath
+          : convertToESMImportPath(
+              path.join(
+                getBasePathForJoin(reExportToResolve.importPath, importAbsolutePath),
+                matchingDefinition.importPath
+              )
+            );
 
         // Fix up the import path to be relative to the original module and handle any renames
         return {
           ...matchingDefinition,
-          importPath: convertToESMImportPath(path.join(basePath, matchingDefinition.importPath)),
+          importPath: resolvedImportPath,
           exportedName: reExportToResolve.exportedName,
           typeOnly: matchingDefinition.typeOnly,
         };
@@ -125,12 +134,21 @@ export function getExportDefinitionFromReExport(
         (reExportToResolve.type === 'namedExport' && reExportToResolve.importedName === 'default')
       ) {
         const matchingDefinition = getExportDefinitionFromReExport(importAbsolutePath, reExport);
-        const basePath = getBasePathForJoin(reExportToResolve.importPath, importAbsolutePath);
+
+        // If the resolved import path is external, keep it as-is (don't join with local path)
+        const resolvedImportPath = !isInternalModule(matchingDefinition.importPath)
+          ? matchingDefinition.importPath
+          : convertToESMImportPath(
+              path.join(
+                getBasePathForJoin(reExportToResolve.importPath, importAbsolutePath),
+                matchingDefinition.importPath
+              )
+            );
 
         // Fix up the import path to be relative to the original module and handle any renames
         return {
           ...matchingDefinition,
-          importPath: convertToESMImportPath(path.join(basePath, matchingDefinition.importPath)),
+          importPath: resolvedImportPath,
           exportedName: reExportToResolve.exportedName,
           typeOnly: matchingDefinition.typeOnly,
         };
@@ -140,12 +158,21 @@ export function getExportDefinitionFromReExport(
         ...reExportToResolve,
         importPath: reExport.importPath,
       });
-      const basePath = getBasePathForJoin(reExportToResolve.importPath, importAbsolutePath);
+
+      // If the resolved import path is external, keep it as-is (don't join with local path)
+      const resolvedImportPath = !isInternalModule(matchingDefinition.importPath)
+        ? matchingDefinition.importPath
+        : convertToESMImportPath(
+            path.join(
+              getBasePathForJoin(reExportToResolve.importPath, importAbsolutePath),
+              matchingDefinition.importPath
+            )
+          );
 
       // Fix up the import path to be relative to the original module and handle any renames
       return {
         ...matchingDefinition,
-        importPath: convertToESMImportPath(path.join(basePath, matchingDefinition.importPath)),
+        importPath: resolvedImportPath,
         exportedName: reExportToResolve.exportedName,
         typeOnly: matchingDefinition.typeOnly,
       };
