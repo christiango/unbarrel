@@ -318,4 +318,100 @@ describe('getExportDefinitionForReExport', () => {
       }
     );
   });
+
+  it('keeps external package path when re-export chain goes through intermediate module', () => {
+    // When resolving a re-export chain that ends at an external package,
+    // the external package path should be kept as-is, not joined with the intermediate path.
+    // Example: index.ts -> ./MessageBar/MessageBar.types -> @fluentui/react-message-bar
+    mock({
+      '/index.ts': 'export type { MessageBarIntent } from "./MessageBar/MessageBar.types";',
+      '/MessageBar': {
+        'MessageBar.types.ts': `
+          import type { MessageBarIntent } from '@fluentui/react-message-bar';
+          export type { MessageBarIntent };
+        `,
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'MessageBarIntent',
+        exportedName: 'MessageBarIntent',
+        importPath: './MessageBar/MessageBar.types',
+        typeOnly: true,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        // Should be the external package path, NOT ./MessageBar/@fluentui/react-message-bar
+        importPath: '@fluentui/react-message-bar',
+        importedName: 'MessageBarIntent',
+        exportedName: 'MessageBarIntent',
+        typeOnly: true,
+      }
+    );
+  });
+
+  it('keeps external package path when default re-export chain goes through intermediate module', () => {
+    // When resolving a default re-export chain that ends at an external package,
+    // the external package path should be kept as-is.
+    mock({
+      '/index.ts': 'export { default as MyComponent } from "./components/Button";',
+      '/components': {
+        'Button.ts': `
+          export { default } from '@external/ui-library';
+        `,
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'default',
+        exportedName: 'MyComponent',
+        importPath: './components/Button',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        // Should be the external package path, NOT ./components/@external/ui-library
+        importPath: '@external/ui-library',
+        importedName: 'default',
+        exportedName: 'MyComponent',
+        typeOnly: false,
+      }
+    );
+  });
+
+  it('keeps external package path when export star chain goes through intermediate module', () => {
+    // When resolving an export * chain that ends at an external package,
+    // the external package path should be kept as-is.
+    mock({
+      '/index.ts': 'export { SomeUtil } from "./utils";',
+      '/utils': {
+        'index.ts': `export * from '@external/utils-package';`,
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'SomeUtil',
+        exportedName: 'SomeUtil',
+        importPath: './utils',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        // Should be the external package path, NOT ./utils/@external/utils-package
+        importPath: '@external/utils-package',
+        importedName: 'SomeUtil',
+        exportedName: 'SomeUtil',
+        typeOnly: false,
+      }
+    );
+  });
 });
