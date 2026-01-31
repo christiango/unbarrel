@@ -910,4 +910,33 @@ export { MyLib };
       reExports: [],
     });
   });
+
+  it('handles export default of a named export', () => {
+    // Pattern: export const MyComponent = ...; export default MyComponent;
+    mock({
+      '/Component.tsx': `
+export const AudioPlaybackControl = (props: any) => {
+  return null;
+};
+
+export default AudioPlaybackControl;
+      `,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getExportsFromModule('/Component.tsx'), {
+      definitions: [
+        {
+          type: 'namedExport',
+          typeOnly: false,
+          name: 'AudioPlaybackControl',
+        },
+        {
+          type: 'defaultExport',
+          typeOnly: false,
+        },
+      ],
+      reExports: [],
+    });
+  });
 });
