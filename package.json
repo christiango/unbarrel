@@ -6,7 +6,6 @@
   "bin": "lib/cli.js",
   "scripts": {
     "build": "tsc",
-    "bundle": "esbuild ./src/cli.ts --bundle --platform=node --outfile=dist/cli.js",
     "test": "yarn run build && node --test lib/**/*.test.js",
     "prettier:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
     "prettier": "prettier --write \"**/*.{ts,tsx,json,md}\"",
@@ -25,8 +24,7 @@
     "@babel/plugin-syntax-typescript": "^7.27.1",
     "@babel/preset-typescript": "^7.27.1",
     "@babel/traverse": "^7.28.0",
-    "commander": "^14.0.0",
-    "esbuild": "^0.25.6"
+    "commander": "^14.0.0"
   },
   "devDependencies": {
     "@types/babel__core": "^7.20.5",
