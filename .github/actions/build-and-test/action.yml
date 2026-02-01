@@ -1,5 +1,5 @@
 name: 'Build and Test'
-description: 'Install dependencies, run prettier check, build, test, and bundle the project'
+description: 'Install dependencies, run prettier check, build, test the project'
 
 runs:
   using: 'composite'
@@ -24,8 +24,4 @@ runs:
 
     - name: Run tests
       run: yarn test
-      shell: bash
-
-    - name: Bundle project
-      run: yarn bundle
       shell: bash
