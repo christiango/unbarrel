@@ -414,4 +414,40 @@ describe('getExportDefinitionForReExport', () => {
       }
     );
   });
+
+  it('finds named exports after export * statements when the export * does not include the named export', () => {
+    mock({
+      '/index.ts': 'export { ProvideViewState } from "./barrel";',
+      '/barrel': {
+        'index.ts': `
+          export * from './other';
+          export type { ProvideViewState } from './source';
+        `,
+        'other.ts': `
+          export interface OtherType {}
+        `,
+        'source.ts': `
+          export interface ProvideViewState {}
+        `,
+      },
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'ProvideViewState',
+        exportedName: 'ProvideViewState',
+        importPath: './barrel',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './barrel/source',
+        importedName: 'ProvideViewState',
+        exportedName: 'ProvideViewState',
+        typeOnly: true,
+      }
+    );
+  });
 });
