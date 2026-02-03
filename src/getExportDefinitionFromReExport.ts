@@ -154,28 +154,33 @@ export function getExportDefinitionFromReExport(
         };
       }
     } else if (reExport.type === 'exportAll') {
-      const matchingDefinition = getExportDefinitionFromReExport(importAbsolutePath, {
-        ...reExportToResolve,
-        importPath: reExport.importPath,
-      });
+      try {
+        const matchingDefinition = getExportDefinitionFromReExport(importAbsolutePath, {
+          ...reExportToResolve,
+          importPath: reExport.importPath,
+        });
 
-      // If the resolved import path is external, keep it as-is (don't join with local path)
-      const resolvedImportPath = !isInternalModule(matchingDefinition.importPath)
-        ? matchingDefinition.importPath
-        : convertToESMImportPath(
-            path.join(
-              getBasePathForJoin(reExportToResolve.importPath, importAbsolutePath),
-              matchingDefinition.importPath
-            )
-          );
+        // If the resolved import path is external, keep it as-is (don't join with local path)
+        const resolvedImportPath = !isInternalModule(matchingDefinition.importPath)
+          ? matchingDefinition.importPath
+          : convertToESMImportPath(
+              path.join(
+                getBasePathForJoin(reExportToResolve.importPath, importAbsolutePath),
+                matchingDefinition.importPath
+              )
+            );
 
-      // Fix up the import path to be relative to the original module and handle any renames
-      return {
-        ...matchingDefinition,
-        importPath: resolvedImportPath,
-        exportedName: reExportToResolve.exportedName,
-        typeOnly: matchingDefinition.typeOnly,
-      };
+        // Fix up the import path to be relative to the original module and handle any renames
+        return {
+          ...matchingDefinition,
+          importPath: resolvedImportPath,
+          exportedName: reExportToResolve.exportedName,
+          typeOnly: matchingDefinition.typeOnly,
+        };
+      } catch {
+        // If the named export is not found through this export * path,
+        // continue to the next re-export instead of throwing an error
+      }
     }
   }
 
