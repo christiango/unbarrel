@@ -135,4 +135,21 @@ describe('getIssuesInBarrelFile tests', () => {
       },
     ]);
   });
+
+  it('detects barrel file references when the barrel file uses export *', () => {
+    mock({
+      '/index.ts': `export { ShareMode } from "./services";`,
+      '/services/index.ts': `export * from "./shareService";`,
+      '/services/shareService.ts': `export enum ShareMode { Read = 'READ', Write = 'WRITE' }`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getIssuesInBarrelFile('/index.ts'), [
+      {
+        type: 'barrelFileReference',
+        exportedName: 'ShareMode',
+        barrelFilePath: './services/index.ts',
+      },
+    ]);
+  });
 });

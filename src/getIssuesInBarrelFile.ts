@@ -48,7 +48,24 @@ export function isBarrelFileReference(absoluteFilePath: string, importPath: stri
     (reExport) => reExport.type === 'namedExport' && reExport.exportedName === importedName
   );
 
-  return matchingReExport !== undefined && isInternalModule(matchingReExport.importPath);
+  if (matchingReExport !== undefined && isInternalModule(matchingReExport.importPath)) {
+    return true;
+  }
+
+  // Check if the target is a barrel file with export * statements
+  // If it has export * from internal modules and the export is not defined/explicitly re-exported in the target,
+  // then the target is acting as a barrel file forwarder
+  const hasExportAllFromInternal = targetExports.reExports.some(
+    (reExport) => reExport.type === 'exportAll' && isInternalModule(reExport.importPath)
+  );
+
+  if (hasExportAllFromInternal) {
+    // The target module is a barrel file (has export *), and the export is not directly defined or explicitly
+    // re-exported there, so it's being implicitly forwarded - this is a barrel file reference
+    return true;
+  }
+
+  return false;
 }
 
 /**
