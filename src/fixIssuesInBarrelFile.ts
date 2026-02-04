@@ -58,6 +58,16 @@ function cleanupExportsInAST(ast: babel.types.File) {
             }
           }
 
+          // If the current export statement is also an export type {} statement, switch it to export { type foo } style
+          if (path.node.exportKind === 'type') {
+            path.node.exportKind = 'value';
+            for (const specifier of path.node.specifiers) {
+              if (specifier.type === 'ExportSpecifier') {
+                specifier.exportKind = 'type';
+              }
+            }
+          }
+
           for (const specifier of path.node.specifiers) {
             if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
               const exportedName = specifier.exported.name;
