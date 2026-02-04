@@ -623,4 +623,30 @@ export type ServiceConfig = { url: string };
 export { configInfo as externalConfigInfo } from "@acme/external-lib";`
     );
   });
+
+  it('handles mixed exports from both direct modules and barrel files', () => {
+    // This test verifies that direct module exports (non-barrel files) remain unchanged
+    // while barrel file references get resolved to their true sources
+    mock({
+      '/index.ts': `export { getValue } from "./Contracts/ValueProvider";
+export type { Config } from "./Contracts/ValueProvider";
+export { helper } from "./utilities/module";`,
+      '/Contracts/ValueProvider.ts': `
+export function getValue() { return 42; }
+export type Config = { enabled: boolean };
+      `,
+      '/utilities/module/index.ts': `export { helper } from "./helper";`,
+      '/utilities/module/helper.ts': `export const helper = () => 'helper';`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    // Direct module exports stay as-is, barrel file exports get resolved to their source
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export { getValue, type Config } from "./Contracts/ValueProvider";
+export { helper } from "./utilities/module/helper";`
+    );
+  });
 });
