@@ -979,8 +979,8 @@ export default AudioPlaybackControl;
 
     it('handles modules that re-export asset files', () => {
       mock({
-        '/utils.ts': 'export { clipchampIcon } from "./clipchamp.svg";',
-        '/clipchamp.svg': '<svg></svg>',
+        '/utils.ts': 'export { brandIcon } from "./icon.svg";',
+        '/icon.svg': '<svg></svg>',
         './node_modules': mock.load('node_modules'),
       });
 
@@ -990,9 +990,9 @@ export default AudioPlaybackControl;
         reExports: [
           {
             type: 'namedExport',
-            importedName: 'clipchampIcon',
-            exportedName: 'clipchampIcon',
-            importPath: './clipchamp.svg',
+            importedName: 'brandIcon',
+            exportedName: 'brandIcon',
+            importPath: './icon.svg',
             typeOnly: false,
           },
         ],
@@ -1024,11 +1024,11 @@ export default AudioPlaybackControl;
     it('handles barrel files with direct asset imports', () => {
       mock({
         '/barrel.ts': `
-          export { clipchampIcon } from "./assets/clipchamp.svg";
+          export { appIcon } from "./assets/icon.svg";
           export { styles } from "./styles/main.css";
           export { config } from "./config.json";
         `,
-        '/assets/clipchamp.svg': '<svg></svg>',
+        '/assets/icon.svg': '<svg></svg>',
         '/styles/main.css': 'body { color: red; }',
         '/config.json': '{"name": "app"}',
         './node_modules': mock.load('node_modules'),
@@ -1040,9 +1040,9 @@ export default AudioPlaybackControl;
         reExports: [
           {
             type: 'namedExport',
-            importedName: 'clipchampIcon',
-            exportedName: 'clipchampIcon',
-            importPath: './assets/clipchamp.svg',
+            importedName: 'appIcon',
+            exportedName: 'appIcon',
+            importPath: './assets/icon.svg',
             typeOnly: false,
           },
           {
@@ -1067,7 +1067,7 @@ export default AudioPlaybackControl;
       mock({
         '/index.ts': 'export { icon } from "./layer1";\n',
         '/layer1.ts': 'export { icon } from "./layer2";\n',
-        '/layer2.ts': 'export { clipchampIcon as icon } from "./icon.svg";\n',
+        '/layer2.ts': 'export { appIcon as icon } from "./icon.svg";\n',
         '/icon.svg': '<svg></svg>',
         './node_modules': mock.load('node_modules'),
       });
@@ -1099,8 +1099,29 @@ export default AudioPlaybackControl;
       });
 
       const exports = getExportsFromModule('/utils.ts');
-      assert.strictEqual(exports.definitions.length, 2); // helper and process
-      assert.strictEqual(exports.reExports.length, 1); // icon from SVG
+      assert.deepEqual(exports, {
+        definitions: [
+          {
+            type: 'namedExport',
+            typeOnly: false,
+            name: 'helper',
+          },
+          {
+            type: 'namedExport',
+            typeOnly: false,
+            name: 'process',
+          },
+        ],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'icon',
+            exportedName: 'icon',
+            importPath: './icon.svg',
+            typeOnly: false,
+          },
+        ],
+      });
     });
 
     it('handles asset files in nested directories', () => {
@@ -1111,27 +1132,57 @@ export default AudioPlaybackControl;
       });
 
       const exports = getExportsFromModule('/barrel.ts');
-      assert.strictEqual(exports.reExports[0].importPath, './assets/icons/brand/logo.svg');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'icon',
+            exportedName: 'icon',
+            importPath: './assets/icons/brand/logo.svg',
+            typeOnly: false,
+          },
+        ],
+      });
     });
 
     it('handles asset file with complex export patterns', () => {
       mock({
         '/barrel.ts': `
           export { default as icon } from "./icon.svg";
-          export { clipchampIcon } from "./clipchamp.svg";
+          export { appIcon } from "./app.svg";
           export * from "./code";
         `,
         '/icon.svg': '<svg></svg>',
-        '/clipchamp.svg': '<svg></svg>',
+        '/app.svg': '<svg></svg>',
         '/code.ts': 'export const helper = () => {};',
         './node_modules': mock.load('node_modules'),
       });
 
       const exports = getExportsFromModule('/barrel.ts');
-      // Should have 2 asset re-exports and 1 export *
-      assert(exports.reExports.some((e) => e.type === 'namedExport' && e.exportedName === 'icon'));
-      assert(exports.reExports.some((e) => e.type === 'namedExport' && e.exportedName === 'clipchampIcon'));
-      assert(exports.reExports.some((e) => e.type === 'exportAll'));
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'default',
+            exportedName: 'icon',
+            importPath: './icon.svg',
+            typeOnly: false,
+          },
+          {
+            type: 'namedExport',
+            importedName: 'appIcon',
+            exportedName: 'appIcon',
+            importPath: './app.svg',
+            typeOnly: false,
+          },
+          {
+            type: 'exportAll',
+            importPath: './code',
+          },
+        ],
+      });
     });
   });
 });

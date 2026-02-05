@@ -653,15 +653,15 @@ export { helper } from "./utilities/module/helper";`
   describe('Asset import handling', () => {
     it('preserves asset imports in barrel files when there are no barrel file issues', () => {
       mock({
-        '/barrel.ts': 'export { clipchampIcon } from "./clipchamp.svg";\n',
-        '/clipchamp.svg': '<svg></svg>',
+        '/barrel.ts': 'export { appIcon } from "./icon.svg";\n',
+        '/icon.svg': '<svg></svg>',
         './node_modules': mock.load('node_modules'),
       });
 
       fixIssuesInBarrelFile('/barrel.ts');
 
       const result = fs.readFileSync('/barrel.ts', 'utf8');
-      assert.strictEqual(result, 'export { clipchampIcon } from "./clipchamp.svg";\n');
+      assert.strictEqual(result, 'export { appIcon } from "./icon.svg";\n');
     });
 
     it('handles barrel files with mixed code and asset exports', () => {
@@ -681,8 +681,8 @@ export { helper } from "./utilities/module/helper";`
     it('preserves asset imports when resolving barrel file references', () => {
       mock({
         '/index.ts': 'export { icon } from "./utils";\n',
-        '/utils/index.ts': 'export { clipchampIcon as icon } from "../assets/clipchamp.svg";\n',
-        '/assets/clipchamp.svg': '<svg></svg>',
+        '/utils/index.ts': 'export { appIcon as icon } from "../assets/icon.svg";\n',
+        '/assets/icon.svg': '<svg></svg>',
         './node_modules': mock.load('node_modules'),
       });
 
@@ -690,7 +690,7 @@ export { helper } from "./utilities/module/helper";`
 
       const result = fs.readFileSync('/index.ts', 'utf8');
       // Should preserve the asset import, resolved from root perspective
-      assert.strictEqual(result, 'export { clipchampIcon as icon } from "./assets/clipchamp.svg";');
+      assert.strictEqual(result, 'export { appIcon as icon } from "./assets/icon.svg";');
     });
 
     it('handles export * with subsequent asset re-exports', () => {
