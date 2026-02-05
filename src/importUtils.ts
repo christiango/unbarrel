@@ -61,17 +61,44 @@ export function convertAbsolutePathToRelativeImportPath(absolutePath: string, ba
 export function isAssetFile(filePath: string): boolean {
   const assetExtensions = [
     // Images
-    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.svg',
+    '.ico',
+    '.bmp',
     // Styles
-    '.css', '.scss', '.sass', '.less', '.styl',
+    '.css',
+    '.scss',
+    '.sass',
+    '.less',
+    '.styl',
     // Data
-    '.json', '.yaml', '.yml', '.toml', '.xml', '.csv',
+    '.json',
+    '.yaml',
+    '.yml',
+    '.toml',
+    '.xml',
+    '.csv',
     // Fonts
-    '.woff', '.woff2', '.ttf', '.otf', '.eot',
+    '.woff',
+    '.woff2',
+    '.ttf',
+    '.otf',
+    '.eot',
     // Media
-    '.mp3', '.mp4', '.webm', '.ogg', '.wav', '.mov',
+    '.mp3',
+    '.mp4',
+    '.webm',
+    '.ogg',
+    '.wav',
+    '.mov',
     // Other
-    '.pdf', '.txt', '.md',
+    '.pdf',
+    '.txt',
+    '.md',
   ];
 
   const ext = path.extname(filePath).toLowerCase();

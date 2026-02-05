@@ -1130,9 +1130,7 @@ export default AudioPlaybackControl;
       const exports = getExportsFromModule('/barrel.ts');
       // Should have 2 asset re-exports and 1 export *
       assert(exports.reExports.some((e) => e.type === 'namedExport' && e.exportedName === 'icon'));
-      assert(
-        exports.reExports.some((e) => e.type === 'namedExport' && e.exportedName === 'clipchampIcon')
-      );
+      assert(exports.reExports.some((e) => e.type === 'namedExport' && e.exportedName === 'clipchampIcon'));
       assert(exports.reExports.some((e) => e.type === 'exportAll'));
     });
   });
