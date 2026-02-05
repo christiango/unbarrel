@@ -64,26 +64,6 @@ export function resolveModulePath(absoluteModulePath: string): string {
         }
       }
     }
-
-    // Try asset files if no code file was found
-    if (!resolvedFilePath) {
-      const assetExtensions = [
-        '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp',
-        '.css', '.scss', '.sass', '.less', '.styl',
-        '.json', '.yaml', '.yml', '.toml', '.xml', '.csv',
-        '.woff', '.woff2', '.ttf', '.otf', '.eot',
-        '.mp3', '.mp4', '.webm', '.ogg', '.wav', '.mov',
-        '.pdf', '.txt', '.md',
-      ];
-
-      for (const ext of assetExtensions) {
-        const filePath = absoluteModulePath + ext;
-        if (fs.existsSync(filePath)) {
-          resolvedFilePath = filePath;
-          break;
-        }
-      }
-    }
   }
 
   if (!resolvedFilePath) {
