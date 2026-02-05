@@ -649,4 +649,128 @@ export type Config = { enabled: boolean };
 export { helper } from "./utilities/module/helper";`
     );
   });
+
+  describe('Asset import handling', () => {
+    it('preserves asset imports in barrel files when there are no barrel file issues', () => {
+      mock({
+        '/barrel.ts': 'export { appIcon } from "./icon.svg";\n',
+        '/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/barrel.ts');
+
+      const result = fs.readFileSync('/barrel.ts', 'utf8');
+      assert.strictEqual(result, 'export { appIcon } from "./icon.svg";\n');
+    });
+
+    it('handles barrel files with mixed code and asset exports', () => {
+      mock({
+        '/barrel.ts': 'export { Component } from "./component";\nexport { icon } from "./icon.svg";\n',
+        '/component.ts': 'export const Component = () => {};\n',
+        '/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/barrel.ts');
+
+      const result = fs.readFileSync('/barrel.ts', 'utf8');
+      assert.strictEqual(result, 'export { Component } from "./component";\nexport { icon } from "./icon.svg";\n');
+    });
+
+    it('preserves asset imports when resolving barrel file references', () => {
+      mock({
+        '/index.ts': 'export { icon } from "./utils";\n',
+        '/utils/index.ts': 'export { appIcon as icon } from "../assets/icon.svg";\n',
+        '/assets/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      // Should preserve the asset import, resolved from root perspective
+      assert.strictEqual(result, 'export { appIcon as icon } from "./assets/icon.svg";');
+    });
+
+    it('handles export * with subsequent asset re-exports', () => {
+      mock({
+        '/barrel.ts': 'export * from "./utils";\n',
+        '/utils/index.ts': `
+          export const helper = () => {};
+          export { icon } from "./icon.svg";
+        `,
+        '/utils/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/barrel.ts');
+
+      const result = fs.readFileSync('/barrel.ts', 'utf8');
+      // Should have flattened export * but include the asset
+      assert.strictEqual(result, 'export { helper } from "./utils";\nexport { icon } from "./utils/icon";');
+    });
+
+    it('handles complex scenario: nested barrels with assets', () => {
+      mock({
+        '/index.ts': 'export { icon } from "./components";\n',
+        '/components/index.ts': 'export { icon } from "../assets/icon.svg";\n',
+        '/assets/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      // Should resolve to the direct asset import from root perspective
+      assert.strictEqual(result, 'export { icon } from "./assets/icon.svg";');
+    });
+
+    it('handles asset types: CSS files', () => {
+      mock({
+        '/barrel.ts': 'export { styles } from "./main.css";\n',
+        '/main.css': 'body { margin: 0; }',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/barrel.ts');
+
+      const result = fs.readFileSync('/barrel.ts', 'utf8');
+      assert.strictEqual(result, 'export { styles } from "./main.css";\n');
+    });
+
+    it('handles asset types: JSON files', () => {
+      mock({
+        '/barrel.ts': 'export { config } from "./config.json";\n',
+        '/config.json': '{"version": "1.0"}',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/barrel.ts');
+
+      const result = fs.readFileSync('/barrel.ts', 'utf8');
+      assert.strictEqual(result, 'export { config } from "./config.json";\n');
+    });
+
+    it('handles asset types: various image formats', () => {
+      mock({
+        '/barrel.ts': `export { pngImage } from "./image.png";
+export { jpgImage } from "./photo.jpg";
+export { webpImage } from "./optimized.webp";
+`,
+        '/image.png': 'PNG_DATA',
+        '/photo.jpg': 'JPG_DATA',
+        '/optimized.webp': 'WEBP_DATA',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/barrel.ts');
+
+      const result = fs.readFileSync('/barrel.ts', 'utf8');
+      assert.strictEqual(
+        result,
+        'export { pngImage } from "./image.png";\nexport { jpgImage } from "./photo.jpg";\nexport { webpImage } from "./optimized.webp";\n'
+      );
+    });
+  });
 });

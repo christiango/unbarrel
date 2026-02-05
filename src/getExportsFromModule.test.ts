@@ -939,4 +939,250 @@ export default AudioPlaybackControl;
       reExports: [],
     });
   });
+
+  describe('Asset import handling', () => {
+    it('returns empty exports for SVG asset files', () => {
+      mock({
+        '/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      assert.deepEqual(getExportsFromModule('/icon.svg'), { definitions: [], reExports: [] });
+    });
+
+    it('returns empty exports for CSS asset files', () => {
+      mock({
+        '/styles.css': 'body { color: red; }',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      assert.deepEqual(getExportsFromModule('/styles.css'), { definitions: [], reExports: [] });
+    });
+
+    it('returns empty exports for JSON asset files', () => {
+      mock({
+        '/data.json': '{"key": "value"}',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      assert.deepEqual(getExportsFromModule('/data.json'), { definitions: [], reExports: [] });
+    });
+
+    it('returns empty exports for PNG image files', () => {
+      mock({
+        '/image.png': 'PNG_BINARY_DATA',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      assert.deepEqual(getExportsFromModule('/image.png'), { definitions: [], reExports: [] });
+    });
+
+    it('handles modules that re-export asset files', () => {
+      mock({
+        '/utils.ts': 'export { brandIcon } from "./icon.svg";',
+        '/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/utils.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'brandIcon',
+            exportedName: 'brandIcon',
+            importPath: './icon.svg',
+            typeOnly: false,
+          },
+        ],
+      });
+    });
+
+    it('handles default exports of asset files', () => {
+      mock({
+        '/utils.ts': 'export { default as icon } from "./icon.svg";',
+        '/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/utils.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'default',
+            exportedName: 'icon',
+            importPath: './icon.svg',
+            typeOnly: false,
+          },
+        ],
+      });
+    });
+
+    it('handles barrel files with direct asset imports', () => {
+      mock({
+        '/barrel.ts': `
+          export { appIcon } from "./assets/icon.svg";
+          export { styles } from "./styles/main.css";
+          export { config } from "./config.json";
+        `,
+        '/assets/icon.svg': '<svg></svg>',
+        '/styles/main.css': 'body { color: red; }',
+        '/config.json': '{"name": "app"}',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/barrel.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'appIcon',
+            exportedName: 'appIcon',
+            importPath: './assets/icon.svg',
+            typeOnly: false,
+          },
+          {
+            type: 'namedExport',
+            importedName: 'styles',
+            exportedName: 'styles',
+            importPath: './styles/main.css',
+            typeOnly: false,
+          },
+          {
+            type: 'namedExport',
+            importedName: 'config',
+            exportedName: 'config',
+            importPath: './config.json',
+            typeOnly: false,
+          },
+        ],
+      });
+    });
+
+    it('handles asset file re-exported through multiple layers', () => {
+      mock({
+        '/index.ts': 'export { icon } from "./layer1";\n',
+        '/layer1.ts': 'export { icon } from "./layer2";\n',
+        '/layer2.ts': 'export { appIcon as icon } from "./icon.svg";\n',
+        '/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/index.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'icon',
+            exportedName: 'icon',
+            importPath: './layer1',
+            typeOnly: false,
+          },
+        ],
+      });
+    });
+
+    it('handles mix of code and asset exports in a single module', () => {
+      mock({
+        '/utils.ts': `
+          export const helper = () => {};
+          export { icon } from "./icon.svg";
+          export function process() {}
+        `,
+        '/icon.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/utils.ts');
+      assert.deepEqual(exports, {
+        definitions: [
+          {
+            type: 'namedExport',
+            typeOnly: false,
+            name: 'helper',
+          },
+          {
+            type: 'namedExport',
+            typeOnly: false,
+            name: 'process',
+          },
+        ],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'icon',
+            exportedName: 'icon',
+            importPath: './icon.svg',
+            typeOnly: false,
+          },
+        ],
+      });
+    });
+
+    it('handles asset files in nested directories', () => {
+      mock({
+        '/barrel.ts': 'export { icon } from "./assets/icons/brand/logo.svg";\n',
+        '/assets/icons/brand/logo.svg': '<svg></svg>',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/barrel.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'icon',
+            exportedName: 'icon',
+            importPath: './assets/icons/brand/logo.svg',
+            typeOnly: false,
+          },
+        ],
+      });
+    });
+
+    it('handles asset file with complex export patterns', () => {
+      mock({
+        '/barrel.ts': `
+          export { default as icon } from "./icon.svg";
+          export { appIcon } from "./app.svg";
+          export * from "./code";
+        `,
+        '/icon.svg': '<svg></svg>',
+        '/app.svg': '<svg></svg>',
+        '/code.ts': 'export const helper = () => {};',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/barrel.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'default',
+            exportedName: 'icon',
+            importPath: './icon.svg',
+            typeOnly: false,
+          },
+          {
+            type: 'namedExport',
+            importedName: 'appIcon',
+            exportedName: 'appIcon',
+            importPath: './app.svg',
+            typeOnly: false,
+          },
+          {
+            type: 'exportAll',
+            importPath: './code',
+          },
+        ],
+      });
+    });
+  });
 });

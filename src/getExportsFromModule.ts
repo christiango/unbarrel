@@ -1,6 +1,7 @@
 import * as babel from '@babel/core';
 import traverse from '@babel/traverse';
 import { parseTypescriptFile } from './parseUtils';
+import { isAssetFile } from './importUtils';
 
 export interface NamedExportDefinition {
   type: 'namedExport';
@@ -69,6 +70,11 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
     definitions: [],
     reExports: [],
   };
+
+  // Asset files (images, styles, data files, etc.) have no exports
+  if (isAssetFile(absoluteFilePath)) {
+    return results;
+  }
 
   const ast = parseTypescriptFile(absoluteFilePath);
 
