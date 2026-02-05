@@ -53,6 +53,32 @@ export function convertAbsolutePathToRelativeImportPath(absolutePath: string, ba
 }
 
 /**
+ * Checks if a file path represents an asset file (non-code file).
+ * Asset files include images, stylesheets, data files, and other static resources.
+ * @param filePath The file path to check
+ * @returns true if the file is an asset file, false if it's a code file
+ */
+export function isAssetFile(filePath: string): boolean {
+  const assetExtensions = [
+    // Images
+    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp',
+    // Styles
+    '.css', '.scss', '.sass', '.less', '.styl',
+    // Data
+    '.json', '.yaml', '.yml', '.toml', '.xml', '.csv',
+    // Fonts
+    '.woff', '.woff2', '.ttf', '.otf', '.eot',
+    // Media
+    '.mp3', '.mp4', '.webm', '.ogg', '.wav', '.mov',
+    // Other
+    '.pdf', '.txt', '.md',
+  ];
+
+  const ext = path.extname(filePath).toLowerCase();
+  return assetExtensions.includes(ext);
+}
+
+/**
  * Given a path to a module and an import within the module, get the absolute path of that import module
  * @param absolutePathOfModule - the absolute path of the module with the import
  * @param importPath - the path of the import to convert into an absolute path

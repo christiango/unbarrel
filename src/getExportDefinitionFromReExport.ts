@@ -1,5 +1,5 @@
 import { getExportsFromModule, ModuleDefaultReExport, ModuleNamedReExport } from './getExportsFromModule';
-import { convertToESMImportPath, getAbsolutePathOfImport, isInternalModule } from './importUtils';
+import { convertToESMImportPath, getAbsolutePathOfImport, isInternalModule, isAssetFile } from './importUtils';
 import path from 'node:path';
 
 /**
@@ -63,6 +63,25 @@ export function getExportDefinitionFromReExport(
   }
 
   const importAbsolutePath = getAbsolutePathOfImport(absolutePathOfModule, reExportToResolve.importPath);
+
+  // Asset files (images, styles, data files, etc.) cannot be further resolved
+  // Return the asset file as the direct import source
+  if (isAssetFile(importAbsolutePath)) {
+    const importedName =
+      reExportToResolve.type === 'defaultExport'
+        ? 'default'
+        : reExportToResolve.type === 'namedExport'
+        ? reExportToResolve.importedName
+        : 'default';
+    return {
+      type: 'resolvedModuleDefinition',
+      importPath: reExportToResolve.importPath,
+      importedName,
+      exportedName: reExportToResolve.exportedName,
+      typeOnly: reExportToResolve.typeOnly,
+    };
+  }
+
   const exportsInModule = getExportsFromModule(importAbsolutePath);
 
   // Collect all matching definitions - there may be both a value and type export with the same name
