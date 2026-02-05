@@ -52,6 +52,48 @@ export function convertAbsolutePathToRelativeImportPath(absolutePath: string, ba
   return convertToESMImportPath(relativePath);
 }
 
+const ASSET_EXTENSIONS = new Set([
+  // Images
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.bmp',
+  // Styles
+  '.css',
+  '.scss',
+  '.sass',
+  '.less',
+  '.styl',
+  // Data
+  '.json',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.xml',
+  '.csv',
+  // Fonts
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.otf',
+  '.eot',
+  // Media
+  '.mp3',
+  '.mp4',
+  '.webm',
+  '.ogg',
+  '.wav',
+  '.mov',
+  // Other
+  '.pdf',
+  '.txt',
+  '.md',
+]);
+
 /**
  * Checks if a file path represents an asset file (non-code file).
  * Asset files include images, stylesheets, data files, and other static resources.
@@ -59,50 +101,8 @@ export function convertAbsolutePathToRelativeImportPath(absolutePath: string, ba
  * @returns true if the file is an asset file, false if it's a code file
  */
 export function isAssetFile(filePath: string): boolean {
-  const assetExtensions = [
-    // Images
-    '.png',
-    '.jpg',
-    '.jpeg',
-    '.gif',
-    '.webp',
-    '.svg',
-    '.ico',
-    '.bmp',
-    // Styles
-    '.css',
-    '.scss',
-    '.sass',
-    '.less',
-    '.styl',
-    // Data
-    '.json',
-    '.yaml',
-    '.yml',
-    '.toml',
-    '.xml',
-    '.csv',
-    // Fonts
-    '.woff',
-    '.woff2',
-    '.ttf',
-    '.otf',
-    '.eot',
-    // Media
-    '.mp3',
-    '.mp4',
-    '.webm',
-    '.ogg',
-    '.wav',
-    '.mov',
-    // Other
-    '.pdf',
-    '.txt',
-    '.md',
-  ];
-
   const ext = path.extname(filePath).toLowerCase();
-  return assetExtensions.includes(ext);
+  return ASSET_EXTENSIONS.has(ext);
 }
 
 /**

@@ -661,7 +661,7 @@ export { helper } from "./utilities/module/helper";`
       fixIssuesInBarrelFile('/barrel.ts');
 
       const result = fs.readFileSync('/barrel.ts', 'utf8');
-      assert.match(result, /export\s+{\s*clipchampIcon\s*}\s+from\s+["']\.\/clipchamp\.svg["']/);
+      assert.strictEqual(result, 'export { clipchampIcon } from "./clipchamp.svg";\n');
     });
 
     it('handles barrel files with mixed code and asset exports', () => {
@@ -675,8 +675,10 @@ export { helper } from "./utilities/module/helper";`
       fixIssuesInBarrelFile('/barrel.ts');
 
       const result = fs.readFileSync('/barrel.ts', 'utf8');
-      assert.match(result, /icon/);
-      assert.match(result, /Component/);
+      assert.strictEqual(
+        result,
+        'export { Component } from "./component";\nexport { icon } from "./icon.svg";\n'
+      );
     });
 
     it('preserves asset imports when resolving barrel file references', () => {
@@ -690,8 +692,8 @@ export { helper } from "./utilities/module/helper";`
       fixIssuesInBarrelFile('/index.ts');
 
       const result = fs.readFileSync('/index.ts', 'utf8');
-      // Should preserve the asset import
-      assert.match(result, /clipchamp\.svg/);
+      // Should preserve the asset import, resolved from root perspective
+      assert.strictEqual(result, 'export { clipchampIcon as icon } from "./assets/clipchamp.svg";');
     });
 
     it('handles export * with subsequent asset re-exports', () => {
@@ -709,8 +711,7 @@ export { helper } from "./utilities/module/helper";`
 
       const result = fs.readFileSync('/barrel.ts', 'utf8');
       // Should have flattened export * but include the asset
-      assert.match(result, /helper/);
-      assert.match(result, /icon/);
+      assert.strictEqual(result, 'export { helper } from "./utils";\nexport { icon } from "./utils/icon";');
     });
 
     it('handles complex scenario: nested barrels with assets', () => {
@@ -724,8 +725,8 @@ export { helper } from "./utilities/module/helper";`
       fixIssuesInBarrelFile('/index.ts');
 
       const result = fs.readFileSync('/index.ts', 'utf8');
-      // Should resolve to the direct asset import
-      assert.match(result, /icon\.svg/);
+      // Should resolve to the direct asset import from root perspective
+      assert.strictEqual(result, 'export { icon } from "./assets/icon.svg";');
     });
 
     it('handles asset types: CSS files', () => {
@@ -738,7 +739,7 @@ export { helper } from "./utilities/module/helper";`
       fixIssuesInBarrelFile('/barrel.ts');
 
       const result = fs.readFileSync('/barrel.ts', 'utf8');
-      assert.match(result, /main\.css/);
+      assert.strictEqual(result, 'export { styles } from "./main.css";\n');
     });
 
     it('handles asset types: JSON files', () => {
@@ -751,16 +752,15 @@ export { helper } from "./utilities/module/helper";`
       fixIssuesInBarrelFile('/barrel.ts');
 
       const result = fs.readFileSync('/barrel.ts', 'utf8');
-      assert.match(result, /config\.json/);
+      assert.strictEqual(result, 'export { config } from "./config.json";\n');
     });
 
     it('handles asset types: various image formats', () => {
       mock({
-        '/barrel.ts': `
-          export { pngImage } from "./image.png";
-          export { jpgImage } from "./photo.jpg";
-          export { webpImage } from "./optimized.webp";
-        `,
+        '/barrel.ts': `export { pngImage } from "./image.png";
+export { jpgImage } from "./photo.jpg";
+export { webpImage } from "./optimized.webp";
+`,
         '/image.png': 'PNG_DATA',
         '/photo.jpg': 'JPG_DATA',
         '/optimized.webp': 'WEBP_DATA',
@@ -770,9 +770,10 @@ export { helper } from "./utilities/module/helper";`
       fixIssuesInBarrelFile('/barrel.ts');
 
       const result = fs.readFileSync('/barrel.ts', 'utf8');
-      assert.match(result, /image\.png/);
-      assert.match(result, /photo\.jpg/);
-      assert.match(result, /optimized\.webp/);
+      assert.strictEqual(
+        result,
+        'export { pngImage } from "./image.png";\nexport { jpgImage } from "./photo.jpg";\nexport { webpImage } from "./optimized.webp";\n'
+      );
     });
   });
 });
