@@ -675,10 +675,7 @@ export { helper } from "./utilities/module/helper";`
       fixIssuesInBarrelFile('/barrel.ts');
 
       const result = fs.readFileSync('/barrel.ts', 'utf8');
-      assert.strictEqual(
-        result,
-        'export { Component } from "./component";\nexport { icon } from "./icon.svg";\n'
-      );
+      assert.strictEqual(result, 'export { Component } from "./component";\nexport { icon } from "./icon.svg";\n');
     });
 
     it('preserves asset imports when resolving barrel file references', () => {
