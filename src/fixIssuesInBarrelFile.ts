@@ -123,6 +123,11 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
 
   // Now go through all export statements and perform the flattening of export star and resolving of re-exports
   for (const exportStatement of exportStatements) {
+    // Skip export * from external packages - we can't enumerate their exports
+    if (!isInternalModule(exportStatement.sourcePath)) {
+      continue;
+    }
+
     if (exportStatement.type === 'exportStar') {
       const flattened = flattenExportStar(absoluteFilePath, exportStatement.nodePath.node.source.value);
 
@@ -156,10 +161,7 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
           const importedName = specifier.local.name;
 
           // If this export points to another barrel file, let's replace it with a direct reference to the true source module
-          if (
-            isInternalModule(exportStatement.sourcePath) &&
-            isBarrelFileReference(absoluteFilePath, exportStatement.sourcePath, importedName)
-          ) {
+          if (isBarrelFileReference(absoluteFilePath, exportStatement.sourcePath, importedName)) {
             const typeOnly = specifier.exportKind === 'type' || exportStatement.nodePath.node.exportKind === 'type';
             const resolvedExport = getExportDefinitionFromReExport(absoluteFilePath, {
               type: importedName === 'default' ? 'defaultExport' : 'namedExport',

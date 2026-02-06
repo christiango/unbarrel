@@ -650,6 +650,23 @@ export { helper } from "./utilities/module/helper";`
     );
   });
 
+  it('skips export type * from an external package', () => {
+    mock({
+      '/index.ts': `export type * from '@acme/types';
+export * from './getStringProvider';`,
+      '/getStringProvider.ts': `export function getStringProvider() { return null; }`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    fixIssuesInBarrelFile('/index.ts');
+
+    assert.strictEqual(
+      fs.readFileSync('/index.ts', 'utf8'),
+      `export type * from '@acme/types';
+export { getStringProvider } from "./getStringProvider";`
+    );
+  });
+
   describe('Asset import handling', () => {
     it('preserves asset imports in barrel files when there are no barrel file issues', () => {
       mock({
