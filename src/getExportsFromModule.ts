@@ -2,6 +2,7 @@ import * as babel from '@babel/core';
 import traverse from '@babel/traverse';
 import { parseTypescriptFile } from './parseUtils';
 import { isAssetFile } from './importUtils';
+import { hasIgnoreComment } from './ignoreComment';
 
 export interface NamedExportDefinition {
   type: 'namedExport';
@@ -25,6 +26,8 @@ export interface ModuleReExportAll {
   type: 'exportAll';
   /** The name of the export as it is imported in the module */
   importPath: string;
+  /** Set to true if the export has an unbarrel-ignore-next-line comment */
+  ignored?: boolean;
 }
 
 export interface ModuleNamedReExport {
@@ -37,6 +40,8 @@ export interface ModuleNamedReExport {
   importPath: string;
   /** Set to true if the import is a type only export, false if it is exported as a value */
   typeOnly: boolean;
+  /** Set to true if the export has an unbarrel-ignore-next-line comment */
+  ignored?: boolean;
 }
 
 export interface ModuleDefaultReExport {
@@ -47,6 +52,8 @@ export interface ModuleDefaultReExport {
   importPath: string;
   /** Set to true if the import is a type only export, false if it is exported as a value */
   typeOnly: boolean;
+  /** Set to true if the export has an unbarrel-ignore-next-line comment */
+  ignored?: boolean;
 }
 
 /** An item re-exported by the module */
@@ -119,21 +126,28 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
             if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
               if ('source' in path.node && path.node.source) {
                 // Check if this is a default re-export: export { default } from "./module"
+                const ignored = hasIgnoreComment(path.node);
                 if (specifier.local.name === 'default' && specifier.exported.name === 'default') {
-                  results.reExports.push({
+                  const reExport: ModuleDefaultReExport = {
                     type: 'defaultExport',
                     exportedName: 'default',
                     importPath: path.node.source.value,
                     typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
-                  });
+                  };
+                  if (ignored) {
+                    reExport.ignored = true;
+                  }
+                  results.reExports.push(reExport);
                 } else {
-                  results.reExports.push({
+                  const reExport: ModuleNamedReExport = {
                     type: 'namedExport',
                     importedName: specifier.local.name,
                     exportedName: specifier.exported.name,
                     importPath: path.node.source.value,
                     typeOnly: specifier.exportKind === 'type' || path.node.exportKind === 'type',
-                  });
+                  };
+                  if (ignored) reExport.ignored = true;
+                  results.reExports.push(reExport);
                 }
               } else {
                 exportsToFindInSecondPass.set(specifier.local.name, {
@@ -173,10 +187,14 @@ export function getExportsFromModule(absoluteFilePath: string): ModuleExports {
       if (!path.parentPath?.isProgram()) return;
 
       if ('source' in path.node && path.node.source) {
-        results.reExports.push({
+        const reExport: ModuleReExportAll = {
           type: 'exportAll',
           importPath: path.node.source.value,
-        });
+        };
+        if (hasIgnoreComment(path.node)) {
+          reExport.ignored = true;
+        }
+        results.reExports.push(reExport);
       }
     },
     // Handle CommonJS exports: exports.name = value

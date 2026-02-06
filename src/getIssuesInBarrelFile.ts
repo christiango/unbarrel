@@ -79,6 +79,10 @@ export function getIssuesInBarrelFile(absoluteFilePath: string): BarrelFileIssue
   const exports = getExportsFromModule(absoluteFilePath);
 
   for (const reExportToVisit of exports.reExports) {
+    if (reExportToVisit.ignored) {
+      continue;
+    }
+
     // An export star makes the current file a barrel file!
     if (reExportToVisit.type === 'exportAll') {
       result.push({
