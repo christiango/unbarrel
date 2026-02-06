@@ -725,7 +725,7 @@ export { getStringProvider } from "./getStringProvider";`
 
       const result = fs.readFileSync('/barrel.ts', 'utf8');
       // Should have flattened export * but include the asset
-      assert.strictEqual(result, 'export { helper } from "./utils";\nexport { icon } from "./utils/icon";');
+      assert.strictEqual(result, 'export { helper } from "./utils";\nexport { icon } from "./utils/icon.svg";');
     });
 
     it('handles complex scenario: nested barrels with assets', () => {
@@ -787,6 +787,27 @@ export { webpImage } from "./optimized.webp";
       assert.strictEqual(
         result,
         'export { pngImage } from "./image.png";\nexport { jpgImage } from "./photo.jpg";\nexport { webpImage } from "./optimized.webp";\n'
+      );
+    });
+
+    it('preserves asset file extensions when flattening export * through a barrel that re-exports default imports from assets', () => {
+      mock({
+        '/index.ts': 'export * from "./assets";\nexport * from "./utils";',
+        '/assets/index.ts': `import icon from './icon.svg';
+import photo from './photo.png';
+export { icon, photo };`,
+        '/assets/icon.svg': '<svg></svg>',
+        '/assets/photo.png': 'PNG_DATA',
+        '/utils.ts': 'export const helper = () => {};',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      assert.strictEqual(
+        result,
+        'export { default as icon } from "./assets/icon.svg";\nexport { default as photo } from "./assets/photo.png";\nexport { helper } from "./utils";'
       );
     });
   });

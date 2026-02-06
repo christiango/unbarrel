@@ -44,9 +44,7 @@ describe('hasIgnoreComment', () => {
 
   it('returns false when directive is a substring of another word', () => {
     const node = t.exportAllDeclaration(t.stringLiteral('./test'));
-    node.leadingComments = [
-      { type: 'CommentLine', value: ' unbarrel-ignore-next-line-extra' } as t.Comment,
-    ];
+    node.leadingComments = [{ type: 'CommentLine', value: ' unbarrel-ignore-next-line-extra' } as t.Comment];
     assert.strictEqual(hasIgnoreComment(node), false);
   });
 });
