@@ -1185,4 +1185,152 @@ export default AudioPlaybackControl;
       });
     });
   });
+
+  describe('unbarrel-ignore-next-line comment', () => {
+    it('sets ignored on export * with unbarrel-ignore-next-line comment', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line
+export * from "./test";`,
+        '/test.ts': 'export const test = 1;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/index.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'exportAll',
+            importPath: './test',
+            ignored: true,
+          },
+        ],
+      });
+    });
+
+    it('sets ignored on named re-exports with unbarrel-ignore-next-line comment', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line
+export { foo, bar } from "./module";`,
+        '/module.ts': 'export const foo = 1; export const bar = 2;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/index.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'foo',
+            exportedName: 'foo',
+            importPath: './module',
+            typeOnly: false,
+            ignored: true,
+          },
+          {
+            type: 'namedExport',
+            importedName: 'bar',
+            exportedName: 'bar',
+            importPath: './module',
+            typeOnly: false,
+            ignored: true,
+          },
+        ],
+      });
+    });
+
+    it('does not set ignored when there is no unbarrel-ignore-next-line comment', () => {
+      mock({
+        '/index.ts': `export * from "./test";`,
+        '/test.ts': 'export const test = 1;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/index.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'exportAll',
+            importPath: './test',
+          },
+        ],
+      });
+    });
+
+    it('only sets ignored on the commented export, not others', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line
+export * from "./a";
+export * from "./b";`,
+        '/a.ts': 'export const a = 1;',
+        '/b.ts': 'export const b = 2;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/index.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'exportAll',
+            importPath: './a',
+            ignored: true,
+          },
+          {
+            type: 'exportAll',
+            importPath: './b',
+          },
+        ],
+      });
+    });
+
+    it('sets ignored with trailing text after the directive', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line -- TODO: Fix this
+export { foo } from "./module";`,
+        '/module.ts': 'export const foo = 1;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/index.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'namedExport',
+            importedName: 'foo',
+            exportedName: 'foo',
+            importPath: './module',
+            typeOnly: false,
+            ignored: true,
+          },
+        ],
+      });
+    });
+
+    it('sets ignored on default re-exports with unbarrel-ignore-next-line comment', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line
+export { default } from "./module";`,
+        '/module.ts': 'export default 42;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      const exports = getExportsFromModule('/index.ts');
+      assert.deepEqual(exports, {
+        definitions: [],
+        reExports: [
+          {
+            type: 'defaultExport',
+            exportedName: 'default',
+            importPath: './module',
+            typeOnly: false,
+            ignored: true,
+          },
+        ],
+      });
+    });
+  });
 });
