@@ -35,3 +35,28 @@ export { Button, Input } from './components';
 ```
 
 This improves tree-shaking and reduces the performance overhead caused by wildcard re-exports.
+
+### Ignoring exports
+
+You can skip specific exports during both `unbarrel fix` and issue detection by placing a `// unbarrel-ignore-next-line` comment on the line before the export statement:
+
+```typescript
+// unbarrel-ignore-next-line
+export * from './legacy-barrel';
+
+export * from './utils'; // this one will still be processed
+```
+
+You can also add a reason or any trailing text after the directive:
+
+```typescript
+// unbarrel-ignore-next-line -- keeping this as a barrel intentionally
+export * from './public-api';
+```
+
+Block comments are supported as well:
+
+```typescript
+/* unbarrel-ignore-next-line */
+export { Foo, Bar } from './barrel';
+```

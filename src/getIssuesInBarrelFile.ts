@@ -1,7 +1,10 @@
 import { getExportsFromModule } from './getExportsFromModule';
 import path from 'node:path';
+import traverse from '@babel/traverse';
 import { resolveModulePath } from './resolveModulePath';
 import { convertAbsolutePathToRelativeImportPath, isInternalModule } from './importUtils';
+import { hasIgnoreComment } from './ignoreComment';
+import { parseTypescriptFile } from './parseUtils';
 
 /** Error when one of the exports of the barrel file is from another barrel file */
 export interface BarrelFileReferenceError {
@@ -68,6 +71,33 @@ export function isBarrelFileReference(absoluteFilePath: string, importPath: stri
   return false;
 }
 
+interface IgnoredExports {
+  ignoredNamedImportPaths: Set<string>;
+  ignoredExportAllImportPaths: Set<string>;
+}
+
+function getIgnoredExports(absoluteFilePath: string): IgnoredExports {
+  const ignoredNamedImportPaths = new Set<string>();
+  const ignoredExportAllImportPaths = new Set<string>();
+
+  const ast = parseTypescriptFile(absoluteFilePath);
+
+  traverse(ast, {
+    ExportNamedDeclaration(path) {
+      if (path.node.source && hasIgnoreComment(path.node)) {
+        ignoredNamedImportPaths.add(path.node.source.value);
+      }
+    },
+    ExportAllDeclaration(path) {
+      if (hasIgnoreComment(path.node)) {
+        ignoredExportAllImportPaths.add(path.node.source.value);
+      }
+    },
+  });
+
+  return { ignoredNamedImportPaths, ignoredExportAllImportPaths };
+}
+
 /**
  * Analyzes the exports of the provided file and returns any references to barrel files within the current package. External packages are not included.
  * @param absoluteFilePath The absolute path the the file we will analyze
@@ -77,10 +107,14 @@ export function getIssuesInBarrelFile(absoluteFilePath: string): BarrelFileIssue
   const result: BarrelFileIssue[] = [];
 
   const exports = getExportsFromModule(absoluteFilePath);
+  const ignored = getIgnoredExports(absoluteFilePath);
 
   for (const reExportToVisit of exports.reExports) {
     // An export star makes the current file a barrel file!
     if (reExportToVisit.type === 'exportAll') {
+      if (ignored.ignoredExportAllImportPaths.has(reExportToVisit.importPath)) {
+        continue;
+      }
       result.push({
         type: 'exportAll',
         barrelFilePath: absoluteFilePath,
@@ -88,6 +122,9 @@ export function getIssuesInBarrelFile(absoluteFilePath: string): BarrelFileIssue
     }
     // Only consider internal modules (relative paths) and named re-exports
     else if (reExportToVisit.type === 'namedExport' && isInternalModule(reExportToVisit.importPath)) {
+      if (ignored.ignoredNamedImportPaths.has(reExportToVisit.importPath)) {
+        continue;
+      }
       if (isBarrelFileReference(absoluteFilePath, reExportToVisit.importPath, reExportToVisit.importedName)) {
         const potentialBarrelFilePath = resolveModulePath(
           path.resolve(path.dirname(absoluteFilePath), reExportToVisit.importPath)

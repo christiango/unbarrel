@@ -790,4 +790,116 @@ export { webpImage } from "./optimized.webp";
       );
     });
   });
+
+  describe('unbarrel-ignore-next-line comment', () => {
+    it('skips export * with unbarrel-ignore-next-line comment', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line
+export * from "./test";`,
+        '/test.ts': 'export const test = 1;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      assert.strictEqual(
+        fs.readFileSync('/index.ts', 'utf8'),
+        `// unbarrel-ignore-next-line
+export * from "./test";`
+      );
+    });
+
+    it('skips barrel file reference with unbarrel-ignore-next-line comment', () => {
+      mock({
+        '/index.ts': `export { test } from "./test";
+// unbarrel-ignore-next-line
+export { barrelFileExport } from "./barrel";`,
+        '/test.ts': 'export const test = 1;',
+        '/barrel/index.ts': 'export { barrelFileExport } from "./source";',
+        '/barrel/source.ts': 'export const barrelFileExport = 12;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      assert.strictEqual(
+        fs.readFileSync('/index.ts', 'utf8'),
+        `export { test } from "./test";
+// unbarrel-ignore-next-line
+export { barrelFileExport } from "./barrel";`
+      );
+    });
+
+    it('only skips the export with unbarrel-ignore-next-line, not other exports', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line
+export * from "./a";
+export * from "./b";`,
+        '/a.ts': 'export const aValue = 1;',
+        '/b.ts': 'export const bValue = 2;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      assert.strictEqual(
+        fs.readFileSync('/index.ts', 'utf8'),
+        `// unbarrel-ignore-next-line
+export * from "./a";
+export { bValue } from "./b";`
+      );
+    });
+
+    it('supports block comment style for unbarrel-ignore-next-line', () => {
+      mock({
+        '/index.ts': `/* unbarrel-ignore-next-line */
+export * from "./test";`,
+        '/test.ts': 'export const test = 1;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      assert.strictEqual(
+        fs.readFileSync('/index.ts', 'utf8'),
+        `/* unbarrel-ignore-next-line */
+export * from "./test";`
+      );
+    });
+
+    it('works with trailing text after the directive', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line -- TODO: Fix this
+export * from "./test";`,
+        '/test.ts': 'export const test = 1;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      assert.strictEqual(
+        fs.readFileSync('/index.ts', 'utf8'),
+        `// unbarrel-ignore-next-line -- TODO: Fix this
+export * from "./test";`
+      );
+    });
+
+    it('works with trailing text on a barrel file reference', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line -- keeping this barrel intentionally
+export { barrelFileExport } from "./barrel";`,
+        '/barrel/index.ts': 'export { barrelFileExport } from "./source";',
+        '/barrel/source.ts': 'export const barrelFileExport = 12;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      assert.strictEqual(
+        fs.readFileSync('/index.ts', 'utf8'),
+        `// unbarrel-ignore-next-line -- keeping this barrel intentionally
+export { barrelFileExport } from "./barrel";`
+      );
+    });
+  });
 });
