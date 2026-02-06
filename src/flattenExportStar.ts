@@ -52,7 +52,10 @@ export function flattenExportStar(absolutePathOfBarrelFile: string, importPath: 
       } else {
         // Fix up the import path to be relative to the root barrel file, not the intermediate module.
         const sourceAbsolutePath = getAbsolutePathOfImport(importAbsolutePath, resolved.importPath);
-        const relativePath = convertAbsolutePathToRelativeImportPath(sourceAbsolutePath, path.dirname(absolutePathOfBarrelFile));
+        const relativePath = convertAbsolutePathToRelativeImportPath(
+          sourceAbsolutePath,
+          path.dirname(absolutePathOfBarrelFile)
+        );
         const fixedImportPath = isAssetFile(sourceAbsolutePath) ? relativePath : stripExtension(relativePath);
         result.push({ ...resolved, importPath: fixedImportPath, typeOnly: resolved.typeOnly });
       }
