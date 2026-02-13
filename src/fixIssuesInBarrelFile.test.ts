@@ -790,4 +790,127 @@ export { webpImage } from "./optimized.webp";
       );
     });
   });
+
+  describe('enabledFixes option', () => {
+    it('only flattens export * when enabledFixes has only flattenExportStar', () => {
+      mock({
+        '/index.ts': `export * from "./test";
+export { barrelFileExport } from "./barrelFileReference";`,
+        '/test.ts': 'export const test = 1;',
+        '/barrelFileReference/index.ts': `
+      export { barrelFileExport } from "./barrelFileExport";
+        `,
+        '/barrelFileReference/barrelFileExport.ts': `
+      export const barrelFileExport = 12;
+      `,
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts', { enabledFixes: { flattenExportStar: true } });
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      assert.strictEqual(
+        result,
+        `export { test } from "./test";
+export { barrelFileExport } from "./barrelFileReference";`
+      );
+    });
+
+    it('only fixes barrel references when enabledFixes has only fixBarrelReferences', () => {
+      mock({
+        '/index.ts': `export * from "./test";
+export { barrelFileExport } from "./barrelFileReference";`,
+        '/test.ts': 'export const test = 1;',
+        '/barrelFileReference/index.ts': `
+      export { barrelFileExport } from "./barrelFileExport";
+        `,
+        '/barrelFileReference/barrelFileExport.ts': `
+      export const barrelFileExport = 12;
+      `,
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts', { enabledFixes: { fixBarrelReferences: true } });
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      // export * should remain since flattenExportStar is not enabled
+      assert.strictEqual(
+        result,
+        `export * from "./test";
+export { barrelFileExport } from "./barrelFileReference/barrelFileExport";`
+      );
+    });
+
+    it('applies all fixes when enabledFixes is not set', () => {
+      mock({
+        '/index.ts': `export * from "./test";
+export { barrelFileExport } from "./barrelFileReference";`,
+        '/test.ts': 'export const test = 1;',
+        '/barrelFileReference/index.ts': `
+      export { barrelFileExport } from "./barrelFileExport";
+        `,
+        '/barrelFileReference/barrelFileExport.ts': `
+      export const barrelFileExport = 12;
+      `,
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      assert.strictEqual(
+        result,
+        `export { test } from "./test";
+export { barrelFileExport } from "./barrelFileReference/barrelFileExport";`
+      );
+    });
+
+    it('applies all fixes when both enabledFixes are set to true', () => {
+      mock({
+        '/index.ts': `export * from "./test";
+export { barrelFileExport } from "./barrelFileReference";`,
+        '/test.ts': 'export const test = 1;',
+        '/barrelFileReference/index.ts': `
+      export { barrelFileExport } from "./barrelFileExport";
+        `,
+        '/barrelFileReference/barrelFileExport.ts': `
+      export const barrelFileExport = 12;
+      `,
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts', { enabledFixes: { flattenExportStar: true, fixBarrelReferences: true } });
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      assert.strictEqual(
+        result,
+        `export { test } from "./test";
+export { barrelFileExport } from "./barrelFileReference/barrelFileExport";`
+      );
+    });
+
+    it('does nothing when enabledFixes is set but both are false', () => {
+      mock({
+        '/index.ts': `export * from "./test";
+export { barrelFileExport } from "./barrelFileReference";`,
+        '/test.ts': 'export const test = 1;',
+        '/barrelFileReference/index.ts': `
+      export { barrelFileExport } from "./barrelFileExport";
+        `,
+        '/barrelFileReference/barrelFileExport.ts': `
+      export const barrelFileExport = 12;
+      `,
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts', { enabledFixes: { flattenExportStar: false, fixBarrelReferences: false } });
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      assert.strictEqual(
+        result,
+        `export * from "./test";
+export { barrelFileExport } from "./barrelFileReference";`
+      );
+    });
+  });
 });

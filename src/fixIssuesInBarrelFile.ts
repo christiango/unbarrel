@@ -93,14 +93,33 @@ function cleanupExportsInAST(ast: babel.types.File) {
   });
 }
 
+export interface EnabledFixes {
+  /** Flatten `export *` statements into explicit named exports. */
+  flattenExportStar?: boolean;
+  /** Resolve re-exports that reference other barrel files to point directly to their true source modules. */
+  fixBarrelReferences?: boolean;
+}
+
+export interface FixIssuesInBarrelFileOptions {
+  /**
+   * Specifies which fixes to apply. If not set, all fixes are enabled.
+   * When set, only the fixes explicitly set to `true` will run.
+   */
+  enabledFixes?: EnabledFixes;
+}
+
 /**
  * Fixes any issues in the specified barrel file.
  * This includes flattening `export *` statements into explicit named exports
  * and resolving exports that reference other barrel files to point directly
  * to their true source modules. The file is modified in place.
  * @param absoluteFilePath - the absolute path of the barrel file to fix
+ * @param options - optional configuration for the fix behavior
  */
-export function fixIssuesInBarrelFile(absoluteFilePath: string) {
+export function fixIssuesInBarrelFile(absoluteFilePath: string, options: FixIssuesInBarrelFileOptions = {}) {
+  const allFixesEnabled = options.enabledFixes === undefined;
+  const shouldFlattenExportStar = allFixesEnabled || options.enabledFixes?.flattenExportStar === true;
+  const shouldFixBarrelReferences = allFixesEnabled || options.enabledFixes?.fixBarrelReferences === true;
   const ast = parseTypescriptFile(absoluteFilePath);
 
   const exportStatements: ExportStatement[] = [];
@@ -128,7 +147,7 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
       continue;
     }
 
-    if (exportStatement.type === 'exportStar') {
+    if (exportStatement.type === 'exportStar' && shouldFlattenExportStar) {
       const flattened = flattenExportStar(absoluteFilePath, exportStatement.nodePath.node.source.value);
 
       const exportNamedDeclarations: t.ExportNamedDeclaration[] = [];
@@ -154,7 +173,7 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string) {
       exportStatement.nodePath.replaceWithMultiple(exportNamedDeclarations);
 
       astModified = true;
-    } else {
+    } else if (exportStatement.type === 'exportNamedDeclaration' && shouldFixBarrelReferences) {
       for (const specifier of exportStatement.nodePath.node.specifiers) {
         if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
           const exportedName = specifier.exported.name;
