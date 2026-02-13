@@ -152,4 +152,60 @@ describe('getIssuesInBarrelFile tests', () => {
       },
     ]);
   });
+
+  describe('unbarrel-ignore-next-line comment', () => {
+    it('skips export * with unbarrel-ignore-next-line comment during issue detection', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line
+export * from "./test";`,
+        '/test.ts': 'export const test = 1;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      assert.deepEqual(getIssuesInBarrelFile('/index.ts'), []);
+    });
+
+    it('skips barrel file reference with unbarrel-ignore-next-line comment during issue detection', () => {
+      mock({
+        '/index.ts': `export { test } from "./test";
+// unbarrel-ignore-next-line
+export { barrelFileExport } from "./barrel";`,
+        '/test.ts': 'export const test = 1;',
+        '/barrel/index.ts': 'export { barrelFileExport } from "./source";',
+        '/barrel/source.ts': 'export const barrelFileExport = 12;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      assert.deepEqual(getIssuesInBarrelFile('/index.ts'), []);
+    });
+
+    it('only skips the export with unbarrel-ignore-next-line, reports other issues', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line
+export * from "./test";
+export * from "./other";`,
+        '/test.ts': 'export const test = 1;',
+        '/other.ts': 'export const other = 1;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      assert.deepEqual(getIssuesInBarrelFile('/index.ts'), [
+        {
+          type: 'exportAll',
+          barrelFilePath: '/index.ts',
+        },
+      ]);
+    });
+
+    it('works with trailing text after the directive during issue detection', () => {
+      mock({
+        '/index.ts': `// unbarrel-ignore-next-line -- TODO: Fix this
+export * from "./test";`,
+        '/test.ts': 'export const test = 1;',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      assert.deepEqual(getIssuesInBarrelFile('/index.ts'), []);
+    });
+  });
 });

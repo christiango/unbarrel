@@ -7,6 +7,7 @@ import { flattenExportStar } from './flattenExportStar';
 import { getExportDefinitionFromReExport } from './getExportDefinitionFromReExport';
 import { parseTypescriptFile } from './parseUtils';
 import { isBarrelFileReference } from './getIssuesInBarrelFile';
+import { hasIgnoreComment } from './ignoreComment';
 import { isInternalModule } from './importUtils';
 
 interface ExportStartStatement {
@@ -129,6 +130,7 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string, options: FixIssu
   traverse(ast, {
     ExportNamedDeclaration(path) {
       if (!path.node.source) return;
+      if (hasIgnoreComment(path.node)) return;
 
       const sourcePath = path.node.source.value;
 
@@ -136,6 +138,8 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string, options: FixIssu
     },
 
     ExportAllDeclaration(path) {
+      if (hasIgnoreComment(path.node)) return;
+
       exportStatements.push({ type: 'exportStar', sourcePath: path.node.source.value, nodePath: path });
     },
   });
