@@ -65,5 +65,53 @@ describe('CLI integration tests', () => {
 
     assert.ok(output.includes('fix'), 'Should show fix command');
     assert.ok(output.includes('barrelFile'), 'Should show barrelFile argument');
+    assert.ok(output.includes('--flatten-export-star'), 'Should show --flatten-export-star option');
+    assert.ok(output.includes('--fix-barrel-references'), 'Should show --fix-barrel-references option');
+  });
+
+  it('unbarrel fix --flatten-export-star only flattens export * without resolving barrel re-exports', () => {
+    // Create a module that exports something
+    const fooPath = path.join(tempDir, 'foo.ts');
+    fs.writeFileSync(fooPath, 'export const hello = 1;\nexport const world = 2;');
+
+    // Create a sub-barrel directory
+    const subDir = path.join(tempDir, 'sub');
+    fs.mkdirSync(subDir);
+    fs.writeFileSync(path.join(subDir, 'index.ts'), 'export { deep } from "./deep";');
+    fs.writeFileSync(path.join(subDir, 'deep.ts'), 'export const deep = 42;');
+
+    // Create a barrel file with export * and a barrel re-export
+    const barrelPath = path.join(tempDir, 'index.ts');
+    fs.writeFileSync(barrelPath, `export * from './foo';\nexport { deep } from './sub';`);
+
+    // Run the CLI with --flatten-export-star
+    execSync(`node "${CLI_PATH}" fix --flatten-export-star "${barrelPath}"`, { encoding: 'utf-8' });
+
+    // Verify the barrel file was transformed
+    const result = fs.readFileSync(barrelPath, 'utf-8');
+    assert.strictEqual(result, `export { hello, world } from "./foo";\nexport { deep } from './sub';`);
+  });
+
+  it('unbarrel fix --fix-barrel-references only resolves barrel re-exports without flattening export *', () => {
+    // Create a module that exports something
+    const fooPath = path.join(tempDir, 'foo.ts');
+    fs.writeFileSync(fooPath, 'export const hello = 1;\nexport const world = 2;');
+
+    // Create a sub-barrel directory
+    const subDir = path.join(tempDir, 'sub');
+    fs.mkdirSync(subDir);
+    fs.writeFileSync(path.join(subDir, 'index.ts'), 'export { deep } from "./deep";');
+    fs.writeFileSync(path.join(subDir, 'deep.ts'), 'export const deep = 42;');
+
+    // Create a barrel file with export * and a barrel re-export
+    const barrelPath = path.join(tempDir, 'index.ts');
+    fs.writeFileSync(barrelPath, `export * from './foo';\nexport { deep } from './sub';`);
+
+    // Run the CLI with --fix-barrel-references
+    execSync(`node "${CLI_PATH}" fix --fix-barrel-references "${barrelPath}"`, { encoding: 'utf-8' });
+
+    // Verify: export * should remain, but barrel re-export should be resolved
+    const result = fs.readFileSync(barrelPath, 'utf-8');
+    assert.strictEqual(result, `export * from './foo';\nexport { deep } from "./sub/deep";`);
   });
 });
