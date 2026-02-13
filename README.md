@@ -39,9 +39,9 @@ export { Button } from './components/Button'; // points to the true source
 
 ##### Options
 
-| Option | Description |
-| --- | --- |
-| `--flatten-export-star` | Only flatten `export *` statements into explicit named exports. |
+| Option                    | Description                                                                 |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `--flatten-export-star`   | Only flatten `export *` statements into explicit named exports.             |
 | `--fix-barrel-references` | Only resolve re-exports through barrel files to point to their true source. |
 
 When neither option is passed, all fixes are applied. Pass one or both to selectively enable specific fixes.

@@ -89,10 +89,7 @@ describe('CLI integration tests', () => {
 
     // Verify the barrel file was transformed
     const result = fs.readFileSync(barrelPath, 'utf-8');
-    assert.strictEqual(
-      result,
-      `export { hello, world } from "./foo";\nexport { deep } from './sub';`
-    );
+    assert.strictEqual(result, `export { hello, world } from "./foo";\nexport { deep } from './sub';`);
   });
 
   it('unbarrel fix --fix-barrel-references only resolves barrel re-exports without flattening export *', () => {
@@ -115,9 +112,6 @@ describe('CLI integration tests', () => {
 
     // Verify: export * should remain, but barrel re-export should be resolved
     const result = fs.readFileSync(barrelPath, 'utf-8');
-    assert.strictEqual(
-      result,
-      `export * from './foo';\nexport { deep } from "./sub/deep";`
-    );
+    assert.strictEqual(result, `export * from './foo';\nexport { deep } from "./sub/deep";`);
   });
 });

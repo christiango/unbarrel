@@ -20,12 +20,17 @@ program
       console.log(`Processing barrel file: ${absolutePath}`);
 
       const hasExplicitFixes = options.flattenExportStar || options.fixBarrelReferences;
-      fixIssuesInBarrelFile(absolutePath, hasExplicitFixes ? {
-        enabledFixes: {
-          flattenExportStar: options.flattenExportStar,
-          fixBarrelReferences: options.fixBarrelReferences,
-        },
-      } : {});
+      fixIssuesInBarrelFile(
+        absolutePath,
+        hasExplicitFixes
+          ? {
+              enabledFixes: {
+                flattenExportStar: options.flattenExportStar,
+                fixBarrelReferences: options.fixBarrelReferences,
+              },
+            }
+          : {}
+      );
       console.log('Successfully fixed barrel file');
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : String(error));
