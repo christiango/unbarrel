@@ -140,6 +140,38 @@ describe('flattenExportStar tests', () => {
     ]);
   });
 
+  it('keeps the original export-star import path when preserveOriginalImportPath is enabled', () => {
+    mock({
+      '/index.ts': `export * from './properties';`,
+      '/properties/index.ts': `
+        export { alpha } from './alpha';
+        export { beta } from './nested/beta';
+      `,
+      '/properties/alpha.ts': `export const alpha = 1;`,
+      '/properties/nested/beta.ts': `export const beta = 2;`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    const result = flattenExportStar('/index.ts', './properties', { preserveOriginalImportPath: true });
+
+    assert.deepStrictEqual(result, [
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'alpha',
+        exportedName: 'alpha',
+        importPath: './properties',
+        typeOnly: false,
+      },
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'beta',
+        exportedName: 'beta',
+        importPath: './properties',
+        typeOnly: false,
+      },
+    ]);
+  });
+
   it('skips export * from external packages', () => {
     // External packages like 'react' or '@foo/bar' cannot be enumerated,
     // so export * from them should be skipped rather than causing an error.
