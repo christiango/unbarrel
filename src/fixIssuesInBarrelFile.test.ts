@@ -949,6 +949,24 @@ export { barrelFileExport } from "./barrelFileReference";`
       );
     });
 
+    it('keeps original export-star module path when flattening through nested re-exports', () => {
+      mock({
+        '/index.ts': `export * from "./properties";`,
+        '/properties/index.ts': `
+export { alpha } from "./alpha";
+export { beta } from "./nested/beta";
+`,
+        '/properties/alpha.ts': `export const alpha = 1;`,
+        '/properties/nested/beta.ts': `export const beta = 2;`,
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts', { enabledFixes: { flattenExportStar: true } });
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      assert.strictEqual(result, `export { alpha, beta } from "./properties";`);
+    });
+
     it('only fixes barrel references when enabledFixes has only fixBarrelReferences', () => {
       mock({
         '/index.ts': `export * from "./test";

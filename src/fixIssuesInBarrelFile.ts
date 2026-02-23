@@ -152,7 +152,9 @@ export function fixIssuesInBarrelFile(absoluteFilePath: string, options: FixIssu
     }
 
     if (exportStatement.type === 'exportStar' && shouldFlattenExportStar) {
-      const flattened = flattenExportStar(absoluteFilePath, exportStatement.nodePath.node.source.value);
+      const flattened = flattenExportStar(absoluteFilePath, exportStatement.nodePath.node.source.value, {
+        preserveOriginalImportPath: !shouldFixBarrelReferences,
+      });
 
       const exportNamedDeclarations: t.ExportNamedDeclaration[] = [];
 
