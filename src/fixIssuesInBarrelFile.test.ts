@@ -810,6 +810,28 @@ export { icon, photo };`,
         'export { default as icon } from "./assets/icon.svg";\nexport { default as photo } from "./assets/photo.png";\nexport { helper } from "./utils";'
       );
     });
+
+    it('fixes a direct named export that points to a barrel which re-exports a default import', () => {
+      // Covers the fixBarrelReferences-only path: no export * involved.
+      // `import icon from './icon.svg'; export { icon }` in the intermediate module means
+      // `export { icon } from './assets'` is a barrel file reference and should be resolved
+      // to `export { default as icon } from './assets/icon.svg'`.
+      mock({
+        '/index.ts': 'export { icon } from "./assets";\nexport { helper } from "./utils";',
+        '/assets/index.ts': `import icon from './icon.svg';\nexport { icon };`,
+        '/assets/icon.svg': '<svg></svg>',
+        '/utils.ts': 'export const helper = () => {};',
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts');
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      assert.strictEqual(
+        result,
+        'export { default as icon } from "./assets/icon.svg";\nexport { helper } from "./utils";'
+      );
+    });
   });
 
   describe('unbarrel-ignore-next-line comment', () => {
@@ -965,6 +987,61 @@ export { beta } from "./nested/beta";
 
       const result = fs.readFileSync('/index.ts', 'utf8');
       assert.strictEqual(result, `export { alpha, beta } from "./properties";`);
+    });
+
+    it('keeps the barrel path and exported names when flattening export * through a barrel with renames and default import re-exports', () => {
+      // When only flattenExportStar is enabled:
+      // - A rename inside the barrel (Button -> PrimaryButton) should keep the exported name
+      //   PrimaryButton, not the internal name Button.
+      // - A default import re-export (`import Logo from './Logo.svg'; export { Logo }`) should
+      //   stay as { Logo } from the barrel path, not resolved to the asset path.
+      // - An inner export * from a nested barrel (./icons) with its own renames and default
+      //   re-exports should produce the names that ./components exposes (StatusBadge, not Badge;
+      //   StarIcon from the nested barrel's perspective, not default from the asset).
+      // - A named re-export with renames from another barrel (./widgets) e.g.
+      //   `export { Tooltip as HoverTooltip } from './widgets'` should preserve the exported
+      //   rename (HoverTooltip) at the barrel path — the internal name Tooltip and the deeper
+      //   structure of ./widgets are irrelevant at this stage.
+      // The barrel reference fix pass (not enabled here) is responsible for resolving further.
+      mock({
+        '/index.ts': `export * from "./components";`,
+        '/components/index.ts': `
+export { Button as PrimaryButton } from './Button';
+import Logo from './Logo.svg';
+export { Logo };
+export * from './icons';
+export { Tooltip as HoverTooltip, SidePanel } from './widgets';
+`,
+        '/components/Button.ts': `export const Button = () => {};`,
+        '/components/Logo.svg': `<svg></svg>`,
+        '/components/icons/index.ts': `
+import StarIcon from './Star.svg';
+export { StarIcon };
+export { Badge as StatusBadge } from './Badge';
+`,
+        '/components/icons/Star.svg': `<svg></svg>`,
+        '/components/icons/Badge.ts': `export const Badge = () => {};`,
+        '/components/widgets/index.ts': `
+export { Tooltip } from './Tooltip';
+export { Panel as SidePanel } from './Panel';
+`,
+        '/components/widgets/Tooltip.ts': `export const Tooltip = () => {};`,
+        '/components/widgets/Panel.ts': `export const Panel = () => {};`,
+        './node_modules': mock.load('node_modules'),
+      });
+
+      fixIssuesInBarrelFile('/index.ts', { enabledFixes: { flattenExportStar: true } });
+
+      const result = fs.readFileSync('/index.ts', 'utf8');
+      // All exports reference './components'. Names are what ./components publicly exports:
+      // - PrimaryButton (not Button), Logo, StatusBadge (not Badge), StarIcon,
+      //   HoverTooltip (not Tooltip), SidePanel (not Panel).
+      // Logo appears last because getExportsFromModule resolves import-then-re-export bindings
+      // in a second traversal pass (after all export statements), so it trails the others.
+      assert.strictEqual(
+        result,
+        `export { PrimaryButton, StatusBadge, StarIcon, HoverTooltip, SidePanel, Logo } from "./components";`
+      );
     });
 
     it('only fixes barrel references when enabledFixes has only fixBarrelReferences', () => {
