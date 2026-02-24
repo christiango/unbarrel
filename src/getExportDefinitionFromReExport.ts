@@ -150,7 +150,10 @@ export function getExportDefinitionFromReExport(
     } else if (reExport.type === 'defaultExport') {
       if (
         reExportToResolve.type === 'defaultExport' ||
-        (reExportToResolve.type === 'namedExport' && reExportToResolve.importedName === 'default')
+        (reExportToResolve.type === 'namedExport' && reExportToResolve.importedName === 'default') ||
+        // `import foo from './source'; export { foo }` — a namedExport query for 'foo' should
+        // resolve through this defaultExport re-export since 'foo' is its exported name.
+        (reExportToResolve.type === 'namedExport' && reExport.exportedName === reExportToResolve.importedName)
       ) {
         const matchingDefinition = getExportDefinitionFromReExport(importAbsolutePath, reExport);
 

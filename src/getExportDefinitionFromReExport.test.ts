@@ -385,6 +385,38 @@ describe('getExportDefinitionForReExport', () => {
     );
   });
 
+  it('resolves a named export that is a renamed default import in the intermediate module', () => {
+    // Pattern: `import icon from './icon.svg'; export { icon }` in the intermediate module.
+    // getExportsFromModule sees this as a defaultExport re-export with exportedName 'icon'.
+    // getExportDefinitionFromReExport must follow it to produce { importedName: 'default', importPath: './assets/icon.svg' }.
+    mock({
+      '/index.ts': `export { icon } from './assets';`,
+      '/assets/index.ts': `
+        import icon from './icon.svg';
+        export { icon };
+      `,
+      '/assets/icon.svg': '<svg></svg>',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(
+      getExportDefinitionFromReExport('/index.ts', {
+        type: 'namedExport',
+        importedName: 'icon',
+        exportedName: 'icon',
+        importPath: './assets',
+        typeOnly: false,
+      }),
+      {
+        type: 'resolvedModuleDefinition',
+        importPath: './assets/icon.svg',
+        importedName: 'default',
+        exportedName: 'icon',
+        typeOnly: false,
+      }
+    );
+  });
+
   it('keeps external package path when export star chain goes through intermediate module', () => {
     // When resolving an export * chain that ends at an external package,
     // the external package path should be kept as-is.

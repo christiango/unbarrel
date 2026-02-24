@@ -153,6 +153,28 @@ describe('getIssuesInBarrelFile tests', () => {
     ]);
   });
 
+  it('detects barrel file references where the intermediate module re-exports a default import as a named export', () => {
+    // `import foo from './source'; export { foo }` in the intermediate module produces a
+    // defaultExport re-export. isBarrelFileReference should still flag this as an indirection.
+    mock({
+      '/index.ts': `export { icon } from './assets';`,
+      '/assets/index.ts': `
+        import icon from './icon.svg';
+        export { icon };
+      `,
+      '/assets/icon.svg': '<svg></svg>',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepEqual(getIssuesInBarrelFile('/index.ts'), [
+      {
+        type: 'barrelFileReference',
+        exportedName: 'icon',
+        barrelFilePath: './assets/index.ts',
+      },
+    ]);
+  });
+
   describe('unbarrel-ignore-next-line comment', () => {
     it('skips export * with unbarrel-ignore-next-line comment during issue detection', () => {
       mock({

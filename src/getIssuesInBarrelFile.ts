@@ -43,12 +43,23 @@ export function isBarrelFileReference(absoluteFilePath: string, importPath: stri
     return false;
   }
 
-  // Check if it's a re-export from an internal module (barrel file reference)
+  // Check if it's a named re-export from an internal module (barrel file reference)
   const matchingReExport = targetExports.reExports.find(
     (reExport) => reExport.type === 'namedExport' && reExport.exportedName === importedName
   );
 
   if (matchingReExport !== undefined && isInternalModule(matchingReExport.importPath)) {
+    return true;
+  }
+
+  // Check for defaultExport re-exports: `import foo from './source'; export { foo }` is recorded
+  // by getExportsFromModule as a defaultExport re-export with exportedName === 'foo'. This is
+  // an indirection through the intermediate module and counts as a barrel file reference.
+  const matchingDefaultReExport = targetExports.reExports.find(
+    (reExport) => reExport.type === 'defaultExport' && reExport.exportedName === importedName
+  );
+
+  if (matchingDefaultReExport !== undefined && isInternalModule(matchingDefaultReExport.importPath)) {
     return true;
   }
 

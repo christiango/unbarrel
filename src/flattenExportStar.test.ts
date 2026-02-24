@@ -9,7 +9,7 @@ describe('flattenExportStar tests', () => {
     mock.restore();
   });
 
-  it('returns all exports and re-exports reachable', () => {
+  it('returns all exports and re-exports reachable, using the original import path for all', () => {
     mock({
       '/index.ts': `
         export * from "./test";
@@ -41,6 +41,7 @@ describe('flattenExportStar tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
+    // All exports use './test1' as the importPath - barrel reference resolution happens in a separate pass
     assert.deepStrictEqual(flattenExportStar('/index.ts', './test1'), [
       {
         type: 'resolvedModuleDefinition',
@@ -60,45 +61,44 @@ describe('flattenExportStar tests', () => {
         type: 'resolvedModuleDefinition',
         importedName: 'test2',
         exportedName: 'test2',
-        importPath: './test2',
+        importPath: './test1',
         typeOnly: false,
       },
       {
         type: 'resolvedModuleDefinition',
         importedName: 'test3',
         exportedName: 'test3',
-        importPath: './test3/test3',
+        importPath: './test1',
         typeOnly: false,
       },
       {
         type: 'resolvedModuleDefinition',
         importedName: 'Interface3',
         exportedName: 'Interface3',
-        importPath: './test3/test3',
+        importPath: './test1',
         typeOnly: true,
       },
       {
         type: 'resolvedModuleDefinition',
         importedName: 'default',
         exportedName: 'default',
-        importPath: './test3/test3',
+        importPath: './test1',
         typeOnly: false,
       },
       {
         type: 'resolvedModuleDefinition',
         importedName: 'test4',
         exportedName: 'test4',
-        importPath: './test4',
+        importPath: './test1',
         typeOnly: false,
       },
     ]);
   });
 
-  it('correctly resolves named re-exports from subdirectory files without duplicating path segments', () => {
-    // This test reproduces a bug where flattening export * through a barrel file
-    // that has named re-exports from subdirectory files would produce duplicated
-    // path segments like "./componentEditableUtils/componentEditableUtils/Utils"
-    // instead of "./utilities/componentEditableUtils/Utils"
+  it('uses the original import path for named re-exports from subdirectory files', () => {
+    // Previously this test verified that path segments were correctly resolved. Now flattenExportStar
+    // always uses the original import path - the barrel reference fix pass in fixIssuesInBarrelFile
+    // is responsible for resolving exports through intermediate barrel files.
     mock({
       '/index.ts': `export * from './utilities';`,
       '/utilities/index.ts': `
@@ -114,7 +114,7 @@ describe('flattenExportStar tests', () => {
 
     const result = flattenExportStar('/index.ts', './utilities');
 
-    // The paths should be correct relative to /index.ts
+    // All exports use './utilities' as the importPath; resolution to true sources happens later
     assert.deepStrictEqual(result, [
       {
         type: 'resolvedModuleDefinition',
@@ -127,20 +127,20 @@ describe('flattenExportStar tests', () => {
         type: 'resolvedModuleDefinition',
         importedName: 'Parser',
         exportedName: 'Parser',
-        importPath: './utilities/componentEditableUtils/Utils',
+        importPath: './utilities',
         typeOnly: true,
       },
       {
         type: 'resolvedModuleDefinition',
         importedName: 'getParser',
         exportedName: 'getParser',
-        importPath: './utilities/componentEditableUtils/Utils',
+        importPath: './utilities',
         typeOnly: false,
       },
     ]);
   });
 
-  it('keeps the original export-star import path when preserveOriginalImportPath is enabled', () => {
+  it('always uses the original import path for named re-exports', () => {
     mock({
       '/index.ts': `export * from './properties';`,
       '/properties/index.ts': `
@@ -152,7 +152,7 @@ describe('flattenExportStar tests', () => {
       './node_modules': mock.load('node_modules'),
     });
 
-    const result = flattenExportStar('/index.ts', './properties', { preserveOriginalImportPath: true });
+    const result = flattenExportStar('/index.ts', './properties');
 
     assert.deepStrictEqual(result, [
       {
@@ -224,6 +224,78 @@ describe('flattenExportStar tests', () => {
         importedName: 'useState',
         exportedName: 'useState',
         importPath: 'react',
+        typeOnly: false,
+      },
+    ]);
+  });
+
+  it('uses the exported name (not the deep source name) when flattening through nested export * with renames', () => {
+    // When an intermediate barrel has `export * from './inner'` and inner has
+    // `export { Badge as StatusBadge } from './Badge'`, getAllExportDefinitionsReachableFromModule
+    // returns importedName='Badge'. That must be overridden to exportedName='StatusBadge' because
+    // from the barrel's perspective the only name it exposes is StatusBadge.
+    mock({
+      '/index.ts': `export * from './components';`,
+      '/components/index.ts': `export * from './icons';`,
+      '/components/icons/index.ts': `
+        import StarIcon from './Star.svg';
+        export { StarIcon };
+        export { Badge as StatusBadge } from './Badge';
+      `,
+      '/components/icons/Star.svg': `<svg></svg>`,
+      '/components/icons/Badge.ts': `export const Badge = () => {};`,
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(flattenExportStar('/index.ts', './components'), [
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'StatusBadge',
+        exportedName: 'StatusBadge',
+        importPath: './components',
+        typeOnly: false,
+      },
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'StarIcon',
+        exportedName: 'StarIcon',
+        importPath: './components',
+        typeOnly: false,
+      },
+    ]);
+  });
+
+  it('treats default import re-exports as named exports using the original import path', () => {
+    // When an intermediate barrel does `import foo from './source'; export { foo }`,
+    // getExportsFromModule produces a defaultExport re-export with exportedName 'foo'.
+    // flattenExportStar keeps the original importPath so that isBarrelFileReference can
+    // detect the indirection and getExportDefinitionFromReExport can resolve it in the
+    // barrel reference fix pass (e.g. to `export { default as icon } from "./assets/icon.svg"`).
+    mock({
+      '/index.ts': `export * from './assets';`,
+      '/assets/index.ts': `
+        import icon from './icon.svg';
+        import photo from './photo.png';
+        export { icon, photo };
+      `,
+      '/assets/icon.svg': '<svg></svg>',
+      '/assets/photo.png': 'PNG_DATA',
+      './node_modules': mock.load('node_modules'),
+    });
+
+    assert.deepStrictEqual(flattenExportStar('/index.ts', './assets'), [
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'icon',
+        exportedName: 'icon',
+        importPath: './assets',
+        typeOnly: false,
+      },
+      {
+        type: 'resolvedModuleDefinition',
+        importedName: 'photo',
+        exportedName: 'photo',
+        importPath: './assets',
         typeOnly: false,
       },
     ]);
